@@ -1,0 +1,5 @@
+nodemodules/
+.DS_Store       
+.env
+dist/
+build/

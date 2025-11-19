@@ -1,5 +1,4 @@
 const express = require("express");
-const mongoose = require("mongoose");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -7,11 +6,14 @@ const mongoSanitize = require("express-mongo-sanitize");
 const rateLimit = require("express-rate-limit");
 const compression = require("compression");
 const morgan = require("morgan");
+const errorHandler = require("./middleware/errorHandler");
+const { connectDB } = require("./config/db");
 
 // تحميل env
 dotenv.config();
 
 const contentRoutes = require("./routes/contentRoutes");
+const authRoutes = require("./routes/authRoutes");
 
 const app = express();
 
@@ -36,7 +38,11 @@ const limiter = rateLimit({
 app.use("/api", limiter);
 
 // Routes
+app.use("/api/auth", authRoutes);
 app.use("/api/content", contentRoutes);
+
+// Error handler
+app.use(errorHandler);
 
 // Connect to MongoDB
 const { MONGO_URI } = process.env;
@@ -46,10 +52,7 @@ if (!MONGO_URI) {
   process.exit(1);
 }
 
-mongoose
-  .connect(MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected"))
-  .catch((err) => console.error("❌ DB Error:", err));
+connectDB();
 
 // Start server
 const PORT = process.env.PORT || 5000;

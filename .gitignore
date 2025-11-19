@@ -3,3 +3,4 @@ nodemodules/
 .env
 dist/
 build/
+env.example

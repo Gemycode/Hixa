@@ -19,7 +19,12 @@ const app = express();
 app.use(express.json({ limit: "20kb" }));
 app.use(cors());
 app.use(helmet());
-app.use(mongoSanitize());
+app.use((req, res, next) => {
+  req.body = mongoSanitize.sanitize(req.body);
+  req.query = mongoSanitize.sanitize(req.query);
+  req.params = mongoSanitize.sanitize(req.params);
+  next();
+});
 app.use(compression());
 app.use(morgan("dev"));
 

@@ -5,6 +5,7 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Password validation: at least 8 chars, 1 uppercase, 1 lowercase, 1 number
 const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$/;
+const roles = ["admin", "engineer", "customer"];
 
 // Register validation
 const validateRegister = (req, res, next) => {
@@ -27,7 +28,7 @@ const validateRegister = (req, res, next) => {
         "any.required": "كلمة المرور مطلوبة",
       }),
     name: Joi.string().trim().max(100).optional(),
-    role: Joi.string().valid("admin", "engineer", "customer").optional(),
+    role: Joi.string().valid(...roles).optional(),
   });
 
   const { error } = schema.validate(req.body, { abortEarly: false });
@@ -72,4 +73,217 @@ const validateHero = (req, res, next) => {
   next();
 };
 
-module.exports = { validateRegister, validateLogin, validateHero };
+// About validation
+const validateAbout = (req, res, next) => {
+  const schema = Joi.object({
+    title_en: Joi.string().max(200).optional(),
+    title_ar: Joi.string().max(200).optional(),
+    description_en: Joi.string().max(5000).optional(),
+    description_ar: Joi.string().max(5000).optional(),
+    image: Joi.string().uri().allow("").optional(),
+    values: Joi.array()
+      .items(
+        Joi.object({
+          title_en: Joi.string().max(200).optional(),
+          title_ar: Joi.string().max(200).optional(),
+          description_en: Joi.string().max(1000).optional(),
+          description_ar: Joi.string().max(1000).optional(),
+        })
+      )
+      .optional(),
+  });
+
+  const { error } = schema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
+  next();
+};
+
+// Services validation
+const validateServices = (req, res, next) => {
+  const schema = Joi.object({
+    title_en: Joi.string().max(200).optional(),
+    title_ar: Joi.string().max(200).optional(),
+    subtitle_en: Joi.string().max(1000).optional(),
+    subtitle_ar: Joi.string().max(1000).optional(),
+    items: Joi.array()
+      .items(
+        Joi.object({
+          title_en: Joi.string().max(200).optional(),
+          title_ar: Joi.string().max(200).optional(),
+          description_en: Joi.string().max(1000).optional(),
+          description_ar: Joi.string().max(1000).optional(),
+          icon: Joi.string().allow("").optional(),
+        })
+      )
+      .optional(),
+  });
+
+  const { error } = schema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
+  next();
+};
+
+// Projects validation
+const validateProjects = (req, res, next) => {
+  const schema = Joi.object({
+    title_en: Joi.string().max(200).optional(),
+    title_ar: Joi.string().max(200).optional(),
+    subtitle_en: Joi.string().max(1000).optional(),
+    subtitle_ar: Joi.string().max(1000).optional(),
+    items: Joi.array()
+      .items(
+        Joi.object({
+          title_en: Joi.string().max(200).optional(),
+          title_ar: Joi.string().max(200).optional(),
+          description_en: Joi.string().max(1000).optional(),
+          description_ar: Joi.string().max(1000).optional(),
+          image: Joi.string().uri().allow("").optional(),
+          link: Joi.string().uri().allow("").optional(),
+        })
+      )
+      .optional(),
+  });
+
+  const { error } = schema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
+  next();
+};
+
+// Features validation
+const validateFeatures = (req, res, next) => {
+  const schema = Joi.object({
+    title_en: Joi.string().max(200).optional(),
+    title_ar: Joi.string().max(200).optional(),
+    subtitle_en: Joi.string().max(1000).optional(),
+    subtitle_ar: Joi.string().max(1000).optional(),
+    items: Joi.array()
+      .items(
+        Joi.object({
+          title_en: Joi.string().max(200).optional(),
+          title_ar: Joi.string().max(200).optional(),
+          description_en: Joi.string().max(1000).optional(),
+          description_ar: Joi.string().max(1000).optional(),
+          icon: Joi.string().allow("").optional(),
+        })
+      )
+      .optional(),
+  });
+
+  const { error } = schema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
+  next();
+};
+
+// CTA validation
+const validateCTA = (req, res, next) => {
+  const schema = Joi.object({
+    title_en: Joi.string().max(200).optional(),
+    title_ar: Joi.string().max(200).optional(),
+    subtitle_en: Joi.string().max(1000).optional(),
+    subtitle_ar: Joi.string().max(1000).optional(),
+    buttonText_en: Joi.string().max(100).optional(),
+    buttonText_ar: Joi.string().max(100).optional(),
+    buttonLink: Joi.string().uri().allow("").optional(),
+  });
+
+  const { error } = schema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
+  next();
+};
+
+// Footer validation
+const validateFooter = (req, res, next) => {
+  const schema = Joi.object({
+    description_en: Joi.string().max(1000).optional(),
+    description_ar: Joi.string().max(1000).optional(),
+    copyright_en: Joi.string().max(200).optional(),
+    copyright_ar: Joi.string().max(200).optional(),
+    links: Joi.array()
+      .items(
+        Joi.object({
+          title_en: Joi.string().max(100).optional(),
+          title_ar: Joi.string().max(100).optional(),
+          url: Joi.string().max(500).allow("").optional(), // Allow hash links like #about or full URLs
+        })
+      )
+      .max(20)
+      .optional(),
+    social: Joi.array()
+      .items(
+        Joi.object({
+          name: Joi.string().max(100).optional(),
+          url: Joi.string().uri().allow("").optional(),
+        })
+      )
+      .max(20)
+      .optional(),
+    contact: Joi.object({
+      email: Joi.string().email().allow("").optional(),
+      phone: Joi.string().max(50).allow("").optional(),
+      address_en: Joi.string().max(500).allow("").optional(),
+      address_ar: Joi.string().max(500).allow("").optional(),
+    }).optional(),
+  });
+
+  const { error } = schema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
+  next();
+};
+
+const validateUserCreate = (req, res, next) => {
+  const schema = Joi.object({
+    email: Joi.string().pattern(emailRegex).required().messages({
+      "string.pattern.base": "البريد الإلكتروني غير صالح",
+      "any.required": "البريد الإلكتروني مطلوب",
+    }),
+    password: Joi.string().pattern(passwordRegex).required().messages({
+      "string.pattern.base": "كلمة المرور يجب أن تحتوي على حرف كبير وصغير ورقم",
+      "any.required": "كلمة المرور مطلوبة",
+    }),
+    name: Joi.string().trim().max(100).optional(),
+    role: Joi.string().valid(...roles).optional(),
+    isActive: Joi.boolean().optional(),
+  });
+
+  const { error } = schema.validate(req.body, { abortEarly: false });
+  if (error) {
+    const messages = error.details.map((detail) => detail.message).join(", ");
+    return res.status(400).json({ message: messages });
+  }
+  next();
+};
+
+const validateUserUpdate = (req, res, next) => {
+  const schema = Joi.object({
+    email: Joi.string().pattern(emailRegex),
+    password: Joi.string().pattern(passwordRegex),
+    name: Joi.string().trim().max(100),
+    role: Joi.string().valid(...roles),
+    isActive: Joi.boolean(),
+  })
+    .min(1)
+    .messages({
+      "object.min": "يجب إرسال حقل واحد على الأقل للتحديث",
+    });
+
+  const { error } = schema.validate(req.body, { abortEarly: false });
+  if (error) {
+    const messages = error.details.map((detail) => detail.message).join(", ");
+    return res.status(400).json({ message: messages });
+  }
+  next();
+};
+
+module.exports = {
+  validateRegister,
+  validateLogin,
+  validateHero,
+  validateAbout,
+  validateServices,
+  validateProjects,
+  validateFeatures,
+  validateCTA,
+  validateFooter,
+  validateUserCreate,
+  validateUserUpdate,
+};

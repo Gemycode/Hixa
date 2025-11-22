@@ -8,6 +8,101 @@ const ContentSchema = new mongoose.Schema(
       subtitle_en: { type: String, required: true },
       subtitle_ar: { type: String, required: true },
     },
+    about: {
+      title_en: { type: String, default: "" },
+      title_ar: { type: String, default: "" },
+      description_en: { type: String, default: "" },
+      description_ar: { type: String, default: "" },
+      image: { type: String, default: "" },
+      values: [
+        {
+          title_en: { type: String, default: "" },
+          title_ar: { type: String, default: "" },
+          description_en: { type: String, default: "" },
+          description_ar: { type: String, default: "" },
+        },
+      ],
+    },
+    services: {
+      title_en: { type: String, default: "" },
+      title_ar: { type: String, default: "" },
+      subtitle_en: { type: String, default: "" },
+      subtitle_ar: { type: String, default: "" },
+      items: [
+        {
+          title_en: { type: String, default: "" },
+          title_ar: { type: String, default: "" },
+          description_en: { type: String, default: "" },
+          description_ar: { type: String, default: "" },
+          icon: { type: String, default: "" },
+        },
+      ],
+    },
+    projects: {
+      title_en: { type: String, default: "" },
+      title_ar: { type: String, default: "" },
+      subtitle_en: { type: String, default: "" },
+      subtitle_ar: { type: String, default: "" },
+      items: [
+        {
+          title_en: { type: String, default: "" },
+          title_ar: { type: String, default: "" },
+          description_en: { type: String, default: "" },
+          description_ar: { type: String, default: "" },
+          image: { type: String, default: "" },
+          link: { type: String, default: "" },
+        },
+      ],
+    },
+    features: {
+      title_en: { type: String, default: "" },
+      title_ar: { type: String, default: "" },
+      subtitle_en: { type: String, default: "" },
+      subtitle_ar: { type: String, default: "" },
+      items: [
+        {
+          title_en: { type: String, default: "" },
+          title_ar: { type: String, default: "" },
+          description_en: { type: String, default: "" },
+          description_ar: { type: String, default: "" },
+          icon: { type: String, default: "" },
+        },
+      ],
+    },
+    cta: {
+      title_en: { type: String, default: "" },
+      title_ar: { type: String, default: "" },
+      subtitle_en: { type: String, default: "" },
+      subtitle_ar: { type: String, default: "" },
+      buttonText_en: { type: String, default: "" },
+      buttonText_ar: { type: String, default: "" },
+      buttonLink: { type: String, default: "" },
+    },
+    footer: {
+      description_en: { type: String, default: "" },
+      description_ar: { type: String, default: "" },
+      copyright_en: { type: String, default: "" },
+      copyright_ar: { type: String, default: "" },
+      links: [
+        {
+          title_en: { type: String, default: "" },
+          title_ar: { type: String, default: "" },
+          url: { type: String, default: "" },
+        },
+      ],
+      social: [
+        {
+          name: { type: String, default: "" },
+          url: { type: String, default: "" },
+        },
+      ],
+      contact: {
+        email: { type: String, default: "" },
+        phone: { type: String, default: "" },
+        address_en: { type: String, default: "" },
+        address_ar: { type: String, default: "" },
+      },
+    },
   },
   { timestamps: true }
 );

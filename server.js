@@ -14,11 +14,34 @@ dotenv.config();
 
 const contentRoutes = require("./routes/contentRoutes");
 const authRoutes = require("./routes/authRoutes");
+const userRoutes = require("./routes/userRoutes");
 
 const app = express();
 
 // Middlewares
-app.use(express.json({ limit: "20kb" }));
+// JSON parser with better error handling
+app.use(
+  express.json({
+    limit: "20kb",
+    strict: true,
+  })
+);
+
+// URL encoded parser for form data
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Handle JSON parsing errors
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
+    return res.status(400).json({
+      message: "خطأ في تنسيق JSON - يرجى التحقق من صحة البيانات المرسلة",
+      error: "JSON syntax error",
+      hint: "تأكد من عدم وجود فاصلة زائدة في نهاية البيانات (trailing comma)",
+    });
+  }
+  next(err);
+});
+
 app.use(cors());
 app.use(helmet());
 app.use((req, res, next) => {
@@ -40,6 +63,7 @@ app.use("/api", limiter);
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/content", contentRoutes);
+app.use("/api/users", userRoutes);
 
 // Error handler
 app.use(errorHandler);

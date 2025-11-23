@@ -1,5 +1,6 @@
 const Content = require("../models/contentModel");
 const { uploadToCloudinary, deleteFromCloudinary } = require("../middleware/upload");
+const mongoose = require("mongoose");
 
 // Helper function to update content section
 const updateSection = async (sectionName, updateData, res) => {
@@ -159,6 +160,153 @@ exports.updateServices = async (req, res) => {
     res.json({
       message: "تم تحديث services بنجاح",
       data: updated.services,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// ADD new project item
+exports.addProjectItem = async (req, res) => {
+  try {
+    const { title_en, title_ar, description_en, description_ar, image, link } = req.body;
+    let imageUrl = image;
+
+    // Handle file upload if image file is provided
+    if (req.file) {
+      imageUrl = await uploadToCloudinary(req.file.buffer, "hixa/projects");
+    }
+
+    const newItem = {
+      _id: new mongoose.Types.ObjectId(),
+      title_en: title_en || "",
+      title_ar: title_ar || "",
+      description_en: description_en || "",
+      description_ar: description_ar || "",
+      image: imageUrl || "",
+      link: link || "",
+    };
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $push: { "projects.items": newItem } },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    const addedItem = updated.projects.items[updated.projects.items.length - 1];
+    res.json({
+      message: "تم إضافة المشروع بنجاح",
+      data: addedItem,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// UPDATE project item by ID
+exports.updateProjectItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "معرف المشروع غير صحيح" });
+    }
+
+    const { title_en, title_ar, description_en, description_ar, image, link } = req.body;
+
+    // Get current content
+    const content = await Content.findOne();
+    if (!content || !content.projects || !content.projects.items) {
+      return res.status(404).json({ message: "المشروع غير موجود" });
+    }
+
+    // Find item by ID
+    const itemIndex = content.projects.items.findIndex(
+      (item) => item._id && item._id.toString() === id
+    );
+
+    if (itemIndex === -1) {
+      return res.status(404).json({ message: "المشروع غير موجود" });
+    }
+
+    const currentItem = content.projects.items[itemIndex];
+    let imageUrl = image || currentItem.image;
+
+    // Handle file upload if image file is provided
+    if (req.file) {
+      imageUrl = await uploadToCloudinary(req.file.buffer, "hixa/projects");
+      
+      // Delete old image if exists
+      if (currentItem.image && currentItem.image.includes("cloudinary.com")) {
+        await deleteFromCloudinary(currentItem.image);
+      }
+    }
+
+    // Update the item
+    const updateFields = {};
+    if (title_en !== undefined) updateFields[`projects.items.${itemIndex}.title_en`] = title_en;
+    if (title_ar !== undefined) updateFields[`projects.items.${itemIndex}.title_ar`] = title_ar;
+    if (description_en !== undefined) updateFields[`projects.items.${itemIndex}.description_en`] = description_en;
+    if (description_ar !== undefined) updateFields[`projects.items.${itemIndex}.description_ar`] = description_ar;
+    if (imageUrl !== undefined) updateFields[`projects.items.${itemIndex}.image`] = imageUrl;
+    if (link !== undefined) updateFields[`projects.items.${itemIndex}.link`] = link;
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $set: updateFields },
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      message: "تم تحديث المشروع بنجاح",
+      data: updated.projects.items[itemIndex],
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// DELETE project item by ID
+exports.deleteProjectItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "معرف المشروع غير صحيح" });
+    }
+
+    // Get current content
+    const content = await Content.findOne();
+    if (!content || !content.projects || !content.projects.items) {
+      return res.status(404).json({ message: "المشروع غير موجود" });
+    }
+
+    // Find item by ID
+    const itemIndex = content.projects.items.findIndex(
+      (item) => item._id && item._id.toString() === id
+    );
+
+    if (itemIndex === -1) {
+      return res.status(404).json({ message: "المشروع غير موجود" });
+    }
+
+    const itemToDelete = content.projects.items[itemIndex];
+
+    // Delete image from Cloudinary if exists
+    if (itemToDelete.image && itemToDelete.image.includes("cloudinary.com")) {
+      await deleteFromCloudinary(itemToDelete.image);
+    }
+
+    // Remove item from array using $pull
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $pull: { "projects.items": { _id: new mongoose.Types.ObjectId(id) } } },
+      { new: true }
+    );
+
+    res.json({
+      message: "تم حذف المشروع بنجاح",
+      data: updated.projects.items,
     });
   } catch (err) {
     res.status(500).json({ message: "خطأ في الخادم", error: err.message });

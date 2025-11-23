@@ -149,6 +149,22 @@ const validateProjects = (req, res, next) => {
   next();
 };
 
+// Project item validation (for add/update single item)
+const validateProjectItem = (req, res, next) => {
+  const schema = Joi.object({
+    title_en: Joi.string().max(200).optional(),
+    title_ar: Joi.string().max(200).optional(),
+    description_en: Joi.string().max(1000).optional(),
+    description_ar: Joi.string().max(1000).optional(),
+    image: Joi.string().uri().allow("").optional(),
+    link: Joi.string().uri().allow("").optional(),
+  });
+
+  const { error } = schema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
+  next();
+};
+
 // Features validation
 const validateFeatures = (req, res, next) => {
   const schema = Joi.object({
@@ -281,6 +297,7 @@ module.exports = {
   validateAbout,
   validateServices,
   validateProjects,
+  validateProjectItem,
   validateFeatures,
   validateCTA,
   validateFooter,

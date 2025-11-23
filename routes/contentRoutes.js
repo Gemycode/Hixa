@@ -7,6 +7,9 @@ const {
   updateAbout,
   updateServices,
   updateProjects,
+  addProjectItem,
+  updateProjectItem,
+  deleteProjectItem,
   updateFeatures,
   updateCTA,
   updateFooter,
@@ -18,6 +21,7 @@ const {
   validateAbout,
   validateServices,
   validateProjects,
+  validateProjectItem,
   validateFeatures,
   validateCTA,
   validateFooter,
@@ -40,6 +44,11 @@ router.put("/projects", protect, adminOnly, (req, res, next) => {
   }
   uploadFields(fields)(req, res, next);
 }, validateProjects, updateProjects);
+
+// Projects items CRUD operations
+router.post("/projects/items", protect, adminOnly, uploadSingle("image"), validateProjectItem, addProjectItem);
+router.put("/projects/items/:id", protect, adminOnly, uploadSingle("image"), validateProjectItem, updateProjectItem);
+router.delete("/projects/items/:id", protect, adminOnly, deleteProjectItem);
 router.put("/features", protect, adminOnly, validateFeatures, updateFeatures);
 router.put("/cta", protect, adminOnly, validateCTA, updateCTA);
 router.put("/footer", protect, adminOnly, validateFooter, updateFooter);

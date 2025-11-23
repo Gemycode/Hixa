@@ -45,6 +45,7 @@ const ContentSchema = new mongoose.Schema(
       subtitle_ar: { type: String, default: "" },
       items: [
         {
+          _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
           title_en: { type: String, default: "" },
           title_ar: { type: String, default: "" },
           description_en: { type: String, default: "" },

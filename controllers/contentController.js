@@ -112,25 +112,13 @@ exports.updateHero = async (req, res) => {
 // UPDATE about section
 exports.updateAbout = async (req, res) => {
   try {
-    const { title_en, title_ar, description_en, description_ar, image, values } = req.body;
-    let imageUrl = image;
-
-    // Handle file upload if image file is provided
-    if (req.file) {
-      imageUrl = await uploadToCloudinary(req.file.buffer, "hixa/about");
-      
-      // Delete old image if exists
-      if (image && image.includes("cloudinary.com")) {
-        await deleteFromCloudinary(image);
-      }
-    }
+    const { title_en, title_ar, description_en, description_ar, values } = req.body;
 
     const updateFields = {
       "about.title_en": title_en,
       "about.title_ar": title_ar,
       "about.description_en": description_en,
       "about.description_ar": description_ar,
-      "about.image": imageUrl,
       "about.values": values || [],
     };
 

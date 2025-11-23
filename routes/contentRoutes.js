@@ -29,7 +29,7 @@ router.get("/", getContent);
 
 // Protected admin routes - update content sections
 router.put("/hero", protect, adminOnly, validateHero, updateHero);
-router.put("/about", protect, adminOnly, uploadSingle("image"), validateAbout, updateAbout);
+router.put("/about", protect, adminOnly, validateAbout, updateAbout);
 router.put("/services", protect, adminOnly, validateServices, updateServices);
 // Projects route - accepts multiple images with field names like image_0, image_1, etc.
 router.put("/projects", protect, adminOnly, (req, res, next) => {

@@ -80,7 +80,6 @@ const validateAbout = (req, res, next) => {
     title_ar: Joi.string().max(200).optional(),
     description_en: Joi.string().max(5000).optional(),
     description_ar: Joi.string().max(5000).optional(),
-    image: Joi.string().uri().allow("").optional(),
     values: Joi.array()
       .items(
         Joi.object({
@@ -88,6 +87,7 @@ const validateAbout = (req, res, next) => {
           title_ar: Joi.string().max(200).optional(),
           description_en: Joi.string().max(1000).optional(),
           description_ar: Joi.string().max(1000).optional(),
+          icon: Joi.string().max(100).allow("").optional(), // lucide-react icon name
         })
       )
       .optional(),

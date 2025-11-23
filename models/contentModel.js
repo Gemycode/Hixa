@@ -13,13 +13,13 @@ const ContentSchema = new mongoose.Schema(
       title_ar: { type: String, default: "" },
       description_en: { type: String, default: "" },
       description_ar: { type: String, default: "" },
-      image: { type: String, default: "" },
       values: [
         {
           title_en: { type: String, default: "" },
           title_ar: { type: String, default: "" },
           description_en: { type: String, default: "" },
           description_ar: { type: String, default: "" },
+          icon: { type: String, default: "" },
         },
       ],
     },

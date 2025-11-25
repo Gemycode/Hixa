@@ -55,6 +55,22 @@ const ContentSchema = new mongoose.Schema(
         },
       ],
     },
+    partners: {
+      title_en: { type: String, default: "" },
+      title_ar: { type: String, default: "" },
+      subtitle_en: { type: String, default: "" },
+      subtitle_ar: { type: String, default: "" },
+      items: [
+        {
+          _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
+          name_en: { type: String, default: "" },
+          name_ar: { type: String, default: "" },
+          logo: { type: String, default: "" },
+          link: { type: String, default: "" },
+          isActive: { type: Boolean, default: true },
+        },
+      ],
+    },
     features: {
       title_en: { type: String, default: "" },
       title_ar: { type: String, default: "" },

@@ -10,6 +10,10 @@ const {
   addProjectItem,
   updateProjectItem,
   deleteProjectItem,
+  updatePartners,
+  addPartnerItem,
+  updatePartnerItem,
+  deletePartnerItem,
   updateFeatures,
   updateCTA,
   updateFooter,
@@ -22,6 +26,8 @@ const {
   validateServices,
   validateProjects,
   validateProjectItem,
+  validatePartners,
+  validatePartnerItem,
   validateFeatures,
   validateCTA,
   validateFooter,
@@ -49,6 +55,12 @@ router.put("/projects", protect, adminOnly, (req, res, next) => {
 router.post("/projects/items", protect, adminOnly, uploadSingle("image"), validateProjectItem, addProjectItem);
 router.put("/projects/items/:id", protect, adminOnly, uploadSingle("image"), validateProjectItem, updateProjectItem);
 router.delete("/projects/items/:id", protect, adminOnly, deleteProjectItem);
+
+// Partners section & items
+router.put("/partners", protect, adminOnly, validatePartners, updatePartners);
+router.post("/partners/items", protect, adminOnly, uploadSingle("logo"), validatePartnerItem, addPartnerItem);
+router.put("/partners/items/:id", protect, adminOnly, uploadSingle("logo"), validatePartnerItem, updatePartnerItem);
+router.delete("/partners/items/:id", protect, adminOnly, deletePartnerItem);
 router.put("/features", protect, adminOnly, validateFeatures, updateFeatures);
 router.put("/cta", protect, adminOnly, validateCTA, updateCTA);
 router.put("/footer", protect, adminOnly, validateFooter, updateFooter);

@@ -1,6 +1,7 @@
 const Content = require("../models/contentModel");
 const { uploadToCloudinary, deleteFromCloudinary } = require("../middleware/upload");
 const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 
 // Helper function to update content section
 const updateSection = async (sectionName, updateData, res) => {
@@ -381,6 +382,166 @@ exports.updateProjects = async (req, res) => {
     res.json({
       message: "تم تحديث projects بنجاح",
       data: updated.projects,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// UPDATE partners section
+exports.updatePartners = async (req, res) => {
+  try {
+    const { title_en, title_ar, subtitle_en, subtitle_ar } = req.body;
+
+    const updateFields = {
+      "partners.title_en": title_en,
+      "partners.title_ar": title_ar,
+      "partners.subtitle_en": subtitle_en,
+      "partners.subtitle_ar": subtitle_ar,
+    };
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $set: updateFields },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    res.json({
+      message: "تم تحديث partners بنجاح",
+      data: updated.partners,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// ADD new partner item
+exports.addPartnerItem = async (req, res) => {
+  try {
+    const { name_en, name_ar, logo, link, isActive } = req.body;
+    let logoUrl = logo;
+
+    if (req.file) {
+      logoUrl = await uploadToCloudinary(req.file.buffer, "hixa/partners");
+    }
+
+    const newItem = {
+      _id: new mongoose.Types.ObjectId(),
+      name_en: name_en || "",
+      name_ar: name_ar || "",
+      logo: logoUrl || "",
+      link: link || "",
+      isActive: typeof isActive === "boolean" ? isActive : isActive === "true",
+    };
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $push: { "partners.items": newItem } },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    const addedItem = updated.partners.items[updated.partners.items.length - 1];
+    res.json({
+      message: "تم إضافة الشريك بنجاح",
+      data: addedItem,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// UPDATE partner item by ID
+exports.updatePartnerItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "معرف الشريك غير صحيح" });
+    }
+
+    const { name_en, name_ar, logo, link, isActive } = req.body;
+
+    const content = await Content.findOne();
+    if (!content || !content.partners || !content.partners.items) {
+      return res.status(404).json({ message: "الشريك غير موجود" });
+    }
+
+    const itemIndex = content.partners.items.findIndex(
+      (item) => item._id && item._id.toString() === id
+    );
+
+    if (itemIndex === -1) {
+      return res.status(404).json({ message: "الشريك غير موجود" });
+    }
+
+    const currentItem = content.partners.items[itemIndex];
+    let logoUrl = logo || currentItem.logo;
+
+    if (req.file) {
+      logoUrl = await uploadToCloudinary(req.file.buffer, "hixa/partners");
+
+      if (currentItem.logo && currentItem.logo.includes("cloudinary.com")) {
+        await deleteFromCloudinary(currentItem.logo);
+      }
+    }
+
+    const updateFields = {};
+    if (name_en !== undefined) updateFields[`partners.items.${itemIndex}.name_en`] = name_en;
+    if (name_ar !== undefined) updateFields[`partners.items.${itemIndex}.name_ar`] = name_ar;
+    if (logoUrl !== undefined) updateFields[`partners.items.${itemIndex}.logo`] = logoUrl;
+    if (link !== undefined) updateFields[`partners.items.${itemIndex}.link`] = link;
+    if (isActive !== undefined) {
+      const activeValue = typeof isActive === "boolean" ? isActive : isActive === "true";
+      updateFields[`partners.items.${itemIndex}.isActive`] = activeValue;
+    }
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $set: updateFields },
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      message: "تم تحديث الشريك بنجاح",
+      data: updated.partners.items[itemIndex],
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// DELETE partner item by ID
+exports.deletePartnerItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "معرف الشريك غير صحيح" });
+    }
+
+    const content = await Content.findOne();
+    if (!content || !content.partners || !content.partners.items) {
+      return res.status(404).json({ message: "الشريك غير موجود" });
+    }
+
+    const item = content.partners.items.find((partner) => partner._id && partner._id.toString() === id);
+    if (!item) {
+      return res.status(404).json({ message: "الشريك غير موجود" });
+    }
+
+    if (item.logo && item.logo.includes("cloudinary.com")) {
+      await deleteFromCloudinary(item.logo);
+    }
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $pull: { "partners.items": { _id: new mongoose.Types.ObjectId(id) } } },
+      { new: true }
+    );
+
+    res.json({
+      message: "تم حذف الشريك بنجاح",
+      data: updated.partners.items,
     });
   } catch (err) {
     res.status(500).json({ message: "خطأ في الخادم", error: err.message });

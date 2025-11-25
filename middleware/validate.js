@@ -165,6 +165,35 @@ const validateProjectItem = (req, res, next) => {
   next();
 };
 
+// Partners validation
+const validatePartners = (req, res, next) => {
+  const schema = Joi.object({
+    title_en: Joi.string().max(200).optional(),
+    title_ar: Joi.string().max(200).optional(),
+    subtitle_en: Joi.string().max(1000).optional(),
+    subtitle_ar: Joi.string().max(1000).optional(),
+  });
+
+  const { error } = schema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
+  next();
+};
+
+// Partner item validation
+const validatePartnerItem = (req, res, next) => {
+  const schema = Joi.object({
+    name_en: Joi.string().max(200).optional(),
+    name_ar: Joi.string().max(200).optional(),
+    logo: Joi.string().uri().allow("").optional(),
+    link: Joi.string().uri().allow("").optional(),
+    isActive: Joi.boolean().optional(),
+  });
+
+  const { error } = schema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
+  next();
+};
+
 // Features validation
 const validateFeatures = (req, res, next) => {
   const schema = Joi.object({
@@ -298,6 +327,8 @@ module.exports = {
   validateServices,
   validateProjects,
   validateProjectItem,
+  validatePartners,
+  validatePartnerItem,
   validateFeatures,
   validateCTA,
   validateFooter,

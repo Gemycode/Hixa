@@ -1,7 +1,6 @@
 const Content = require("../models/contentModel");
 const { uploadToCloudinary, deleteFromCloudinary } = require("../middleware/upload");
 const mongoose = require("mongoose");
-const mongoose = require("mongoose");
 
 // Helper function to update content section
 const updateSection = async (sectionName, updateData, res) => {

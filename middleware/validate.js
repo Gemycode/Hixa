@@ -149,6 +149,32 @@ const validateProjects = (req, res, next) => {
   next();
 };
 
+// Jobs validation
+const validateJobs = (req, res, next) => {
+  const schema = Joi.object({
+    title_en: Joi.string().max(200).optional(),
+    title_ar: Joi.string().max(200).optional(),
+    subtitle_en: Joi.string().max(1000).optional(),
+    subtitle_ar: Joi.string().max(1000).optional(),
+    items: Joi.array()
+      .items(
+        Joi.object({
+          title_en: Joi.string().max(200).optional(),
+          title_ar: Joi.string().max(200).optional(),
+          description_en: Joi.string().max(1000).optional(),
+          description_ar: Joi.string().max(1000).optional(),
+          link: Joi.string().uri().allow("").optional(),
+          isActive: Joi.boolean().optional(),
+        })
+      )
+      .optional(),
+  });
+
+  const { error } = schema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
+  next();
+};
+
 // Project item validation (for add/update single item)
 const validateProjectItem = (req, res, next) => {
   const schema = Joi.object({
@@ -327,6 +353,7 @@ module.exports = {
   validateServices,
   validateProjects,
   validateProjectItem,
+  validateJobs,
   validatePartners,
   validatePartnerItem,
   validateFeatures,

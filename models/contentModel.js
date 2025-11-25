@@ -95,6 +95,22 @@ const ContentSchema = new mongoose.Schema(
       buttonText_ar: { type: String, default: "" },
       buttonLink: { type: String, default: "" },
     },
+    jobs: {
+      title_en: { type: String, default: "" },
+      title_ar: { type: String, default: "" },
+      subtitle_en: { type: String, default: "" },
+      subtitle_ar: { type: String, default: "" },
+      items: [
+        {
+          title_en: { type: String, default: "" },
+          title_ar: { type: String, default: "" },
+          description_en: { type: String, default: "" },
+          description_ar: { type: String, default: "" },
+          link: { type: String, default: "" },
+          isActive: { type: Boolean, default: true },
+        },
+      ],
+    },
     footer: {
       description_en: { type: String, default: "" },
       description_ar: { type: String, default: "" },

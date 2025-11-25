@@ -575,6 +575,48 @@ exports.updateFeatures = async (req, res) => {
   }
 };
 
+// UPDATE jobs section
+exports.updateJobs = async (req, res) => {
+  try {
+    const { title_en, title_ar, subtitle_en, subtitle_ar, items } = req.body;
+
+    const normalizedItems = Array.isArray(items)
+      ? items.map((item) => ({
+          title_en: item.title_en || "",
+          title_ar: item.title_ar || "",
+          description_en: item.description_en || "",
+          description_ar: item.description_ar || "",
+          link: item.link || "",
+          isActive:
+            typeof item.isActive === "boolean"
+              ? item.isActive
+              : item.isActive === "true" || item.isActive === true,
+        }))
+      : [];
+
+    const updateFields = {
+      "jobs.title_en": title_en,
+      "jobs.title_ar": title_ar,
+      "jobs.subtitle_en": subtitle_en,
+      "jobs.subtitle_ar": subtitle_ar,
+      "jobs.items": normalizedItems,
+    };
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $set: updateFields },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    res.json({
+      message: "تم تحديث jobs بنجاح",
+      data: updated.jobs,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
 // UPDATE CTA section
 exports.updateCTA = async (req, res) => {
   const { title_en, title_ar, subtitle_en, subtitle_ar, buttonText_en, buttonText_ar, buttonLink } = req.body;

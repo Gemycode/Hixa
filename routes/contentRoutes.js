@@ -15,6 +15,9 @@ const {
   updatePartnerItem,
   deletePartnerItem,
   updateJobs,
+  addJobItem,
+  updateJobItem,
+  deleteJobItem,
   updateFeatures,
   updateCTA,
   updateFooter,
@@ -30,6 +33,7 @@ const {
   validatePartners,
   validatePartnerItem,
   validateJobs,
+  validateJobItem,
   validateFeatures,
   validateCTA,
   validateFooter,
@@ -64,6 +68,9 @@ router.post("/partners/items", protect, adminOnly, uploadSingle("logo"), validat
 router.put("/partners/items/:id", protect, adminOnly, uploadSingle("logo"), validatePartnerItem, updatePartnerItem);
 router.delete("/partners/items/:id", protect, adminOnly, deletePartnerItem);
 router.put("/jobs", protect, adminOnly, validateJobs, updateJobs);
+router.post("/jobs/items", protect, adminOnly, validateJobItem, addJobItem);
+router.put("/jobs/items/:id", protect, adminOnly, validateJobItem, updateJobItem);
+router.delete("/jobs/items/:id", protect, adminOnly, deleteJobItem);
 router.put("/features", protect, adminOnly, validateFeatures, updateFeatures);
 router.put("/cta", protect, adminOnly, validateCTA, updateCTA);
 router.put("/footer", protect, adminOnly, validateFooter, updateFooter);

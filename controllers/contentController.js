@@ -579,9 +579,17 @@ exports.updateFeatures = async (req, res) => {
 exports.updateJobs = async (req, res) => {
   try {
     const { title_en, title_ar, subtitle_en, subtitle_ar, items } = req.body;
+    let parsedItems = items;
+    if (typeof parsedItems === "string") {
+      try {
+        parsedItems = JSON.parse(parsedItems);
+      } catch (error) {
+        parsedItems = [];
+      }
+    }
 
-    const normalizedItems = Array.isArray(items)
-      ? items.map((item) => ({
+    const normalizedItems = Array.isArray(parsedItems)
+      ? parsedItems.map((item) => ({
           title_en: item.title_en || "",
           title_ar: item.title_ar || "",
           description_en: item.description_en || "",
@@ -611,6 +619,113 @@ exports.updateJobs = async (req, res) => {
     res.json({
       message: "تم تحديث jobs بنجاح",
       data: updated.jobs,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// ADD job item
+exports.addJobItem = async (req, res) => {
+  try {
+    const { title_en, title_ar, description_en, description_ar, link, isActive } = req.body;
+
+    const newItem = {
+      _id: new mongoose.Types.ObjectId(),
+      title_en: title_en || "",
+      title_ar: title_ar || "",
+      description_en: description_en || "",
+      description_ar: description_ar || "",
+      link: link || "",
+      isActive:
+        isActive === undefined ? true : typeof isActive === "boolean" ? isActive : isActive === "true",
+    };
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $push: { "jobs.items": newItem } },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    const addedItem = updated.jobs.items[updated.jobs.items.length - 1];
+    res.json({
+      message: "تم إضافة الوظيفة بنجاح",
+      data: addedItem,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// UPDATE job item by ID
+exports.updateJobItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "معرف الوظيفة غير صحيح" });
+    }
+
+    const { title_en, title_ar, description_en, description_ar, link, isActive } = req.body;
+
+    const content = await Content.findOne();
+    if (!content || !content.jobs || !content.jobs.items) {
+      return res.status(404).json({ message: "الوظيفة غير موجودة" });
+    }
+
+    const itemIndex = content.jobs.items.findIndex((item) => item._id && item._id.toString() === id);
+    if (itemIndex === -1) {
+      return res.status(404).json({ message: "الوظيفة غير موجودة" });
+    }
+
+    const updateFields = {};
+    if (title_en !== undefined) updateFields[`jobs.items.${itemIndex}.title_en`] = title_en;
+    if (title_ar !== undefined) updateFields[`jobs.items.${itemIndex}.title_ar`] = title_ar;
+    if (description_en !== undefined) updateFields[`jobs.items.${itemIndex}.description_en`] = description_en;
+    if (description_ar !== undefined) updateFields[`jobs.items.${itemIndex}.description_ar`] = description_ar;
+    if (link !== undefined) updateFields[`jobs.items.${itemIndex}.link`] = link;
+    if (isActive !== undefined) {
+      updateFields[`jobs.items.${itemIndex}.isActive`] =
+        typeof isActive === "boolean" ? isActive : isActive === "true";
+    }
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $set: updateFields },
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      message: "تم تحديث الوظيفة بنجاح",
+      data: updated.jobs.items[itemIndex],
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// DELETE job item by ID
+exports.deleteJobItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "معرف الوظيفة غير صحيح" });
+    }
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $pull: { "jobs.items": { _id: new mongoose.Types.ObjectId(id) } } },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ message: "الوظيفة غير موجودة" });
+    }
+
+    res.json({
+      message: "تم حذف الوظيفة بنجاح",
+      data: updated.jobs.items,
     });
   } catch (err) {
     res.status(500).json({ message: "خطأ في الخادم", error: err.message });

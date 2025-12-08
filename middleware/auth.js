@@ -65,6 +65,17 @@ const engineerOrAdmin = (req, res, next) => {
   next();
 };
 
+// Client only - requires client role
+const clientOnly = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ message: "غير مصرح لك بالدخول" });
+  }
+  if (req.user.role !== "client") {
+    return res.status(403).json({ message: "غير مسموح - هذه الصفحة للعملاء فقط" });
+  }
+  next();
+};
+
 // Role-based access control - accepts array of allowed roles
 const restrictTo = (...roles) => {
   return (req, res, next) => {
@@ -78,4 +89,4 @@ const restrictTo = (...roles) => {
   };
 };
 
-module.exports = { protect, adminOnly, engineerOrAdmin, restrictTo };
+module.exports = { protect, adminOnly, engineerOrAdmin, clientOnly, restrictTo };

@@ -15,6 +15,9 @@ dotenv.config();
 const contentRoutes = require("./routes/contentRoutes");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
+const subscriberRoutes = require("./routes/subscriberRoutes");
+const projectRoutes = require("./routes/projectRoutes");
+const portfolioRoutes = require("./routes/portfolioRoutes");
 
 const app = express();
 
@@ -64,6 +67,9 @@ app.use("/api", limiter);
 app.use("/api/auth", authRoutes);
 app.use("/api/content", contentRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/subscribers", subscriberRoutes);
+app.use("/api/projects", projectRoutes);
+app.use("/api/portfolio", portfolioRoutes);
 
 // Error handler
 app.use(errorHandler);

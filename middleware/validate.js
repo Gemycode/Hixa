@@ -374,6 +374,53 @@ const validateWorkUpdate = (req, res, next) => {
   next();
 };
 
+// Service Order validation (landing services)
+const validateServiceOrderCreate = (req, res, next) => {
+  const schema = Joi.object({
+    serviceId: Joi.string().trim().max(200).optional(), // Optional - will be auto-determined if not provided
+    serviceType: Joi.string().trim().max(200).optional(),
+    title: Joi.string().trim().max(200).required(),
+    description: Joi.string().trim().max(5000).optional(),
+    orderDetails: Joi.string().trim().max(5000).optional(),
+    email: Joi.string().email({ tlds: { allow: false } }).required(),
+    status: Joi.string()
+      .valid("New", "In Review", "Processing", "Completed", "Cancelled")
+      .optional(),
+  });
+
+  const { error } = schema.validate(req.body, { abortEarly: false });
+  if (error) {
+    const messages = error.details.map((detail) => detail.message).join(", ");
+    return res.status(400).json({ message: messages });
+  }
+  next();
+};
+
+const validateServiceOrderUpdate = (req, res, next) => {
+  const schema = Joi.object({
+    serviceId: Joi.string().trim().max(200).optional(),
+    serviceType: Joi.string().trim().max(200).optional(),
+    title: Joi.string().trim().max(200).optional(),
+    description: Joi.string().trim().max(5000).optional(),
+    orderDetails: Joi.string().trim().max(5000).optional(),
+    email: Joi.string().email({ tlds: { allow: false } }).optional(),
+    status: Joi.string()
+      .valid("New", "In Review", "Processing", "Completed", "Cancelled")
+      .optional(),
+  })
+    .min(1)
+    .messages({
+      "object.min": "يجب إرسال حقل واحد على الأقل للتحديث",
+    });
+
+  const { error } = schema.validate(req.body, { abortEarly: false });
+  if (error) {
+    const messages = error.details.map((detail) => detail.message).join(", ");
+    return res.status(400).json({ message: messages });
+  }
+  next();
+};
+
 const validateUserCreate = (req, res, next) => {
   const schema = Joi.object({
     email: Joi.string().pattern(emailRegex).required().messages({
@@ -580,4 +627,6 @@ module.exports = {
   validateProjectUpdate,
   validateWork,
   validateWorkUpdate,
+  validateServiceOrderCreate,
+  validateServiceOrderUpdate,
 };

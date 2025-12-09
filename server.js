@@ -18,6 +18,7 @@ const userRoutes = require("./routes/userRoutes");
 const subscriberRoutes = require("./routes/subscriberRoutes");
 const projectRoutes = require("./routes/projectRoutes");
 const portfolioRoutes = require("./routes/portfolioRoutes");
+const serviceOrderRoutes = require("./routes/serviceOrderRoutes");
 
 const app = express();
 
@@ -70,6 +71,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/subscribers", subscriberRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/portfolio", portfolioRoutes);
+app.use("/api/service-orders", serviceOrderRoutes);
 
 // Error handler
 app.use(errorHandler);

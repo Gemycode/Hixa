@@ -2,6 +2,42 @@ const errorHandler = (err, req, res, next) => {
   // Log error for debugging
   console.error("Error:", err);
 
+  // Multer errors (file upload)
+  if (err.name === "MulterError") {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({
+        message: "حجم الملف كبير جداً. الحد الأقصى المسموح به هو 50MB",
+      });
+    }
+    if (err.code === "LIMIT_FILE_COUNT") {
+      return res.status(400).json({
+        message: "عدد الملفات كبير جداً",
+      });
+    }
+    if (err.code === "LIMIT_UNEXPECTED_FILE") {
+      return res.status(400).json({
+        message: "حقل ملف غير متوقع",
+      });
+    }
+    return res.status(400).json({
+      message: err.message || "خطأ في رفع الملف",
+    });
+  }
+
+  // File filter errors (from multer)
+  if (err.message && err.message.includes("نوع الملف غير مدعوم")) {
+    return res.status(400).json({
+      message: err.message,
+    });
+  }
+
+  // Cloudinary errors
+  if (err.message && err.message.includes("فشل رفع")) {
+    return res.status(500).json({
+      message: err.message || "فشل رفع الملف إلى السحابة",
+    });
+  }
+
   // Mongoose validation error
   if (err.name === "ValidationError") {
     const messages = Object.values(err.errors).map((e) => e.message).join(", ");
@@ -16,6 +52,13 @@ const errorHandler = (err, req, res, next) => {
     const field = Object.keys(err.keyPattern)[0];
     return res.status(409).json({
       message: `${field} مستخدم بالفعل`,
+    });
+  }
+
+  // Mongoose CastError (invalid ObjectId)
+  if (err.name === "CastError") {
+    return res.status(400).json({
+      message: "معرف غير صحيح",
     });
   }
 

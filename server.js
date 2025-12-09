@@ -46,6 +46,31 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
+// Handle Multer errors (file upload errors)
+app.use((err, req, res, next) => {
+  if (err.name === "MulterError") {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({
+        message: "حجم الملف كبير جداً. الحد الأقصى المسموح به هو 50MB",
+      });
+    }
+    if (err.code === "LIMIT_FILE_COUNT") {
+      return res.status(400).json({
+        message: "عدد الملفات كبير جداً",
+      });
+    }
+    if (err.code === "LIMIT_UNEXPECTED_FILE") {
+      return res.status(400).json({
+        message: "حقل ملف غير متوقع",
+      });
+    }
+    return res.status(400).json({
+      message: err.message || "خطأ في رفع الملف",
+    });
+  }
+  next(err);
+});
+
 app.use(cors());
 app.use(helmet());
 app.use((req, res, next) => {
@@ -72,6 +97,14 @@ app.use("/api/subscribers", subscriberRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/portfolio", portfolioRoutes);
 app.use("/api/service-orders", serviceOrderRoutes);
+
+// 404 handler (route not found)
+app.use((req, res) => {
+  res.status(404).json({
+    message: "المسار غير موجود",
+    path: req.originalUrl,
+  });
+});
 
 // Error handler
 app.use(errorHandler);

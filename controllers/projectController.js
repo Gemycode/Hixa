@@ -1,5 +1,5 @@
 const Project = require("../models/projectModel");
-const { uploadToCloudinary, deleteFromCloudinary } = require("../middleware/upload");
+const { uploadToCloudinary, uploadFileToCloudinary, deleteFromCloudinary } = require("../middleware/upload");
 
 // Helper to sanitize project data for response
 const sanitizeProject = (project) => {
@@ -281,12 +281,23 @@ exports.uploadAttachment = async (req, res, next) => {
       return res.status(403).json({ message: "غير مصرح لك برفع ملفات لهذا المشروع" });
     }
 
-    // Upload to Cloudinary
+    // Upload to Cloudinary (supports any file type)
     const folder = `hixa/projects/${id}/attachments`;
-    const fileUrl = await uploadToCloudinary(req.file.buffer, folder);
+    const fileUrl = await uploadFileToCloudinary(req.file.buffer, folder, req.file.originalname);
 
     // Determine file type
-    const fileType = type || (req.file.mimetype.startsWith("image/") ? "image" : "document");
+    let fileType = type;
+    if (!fileType) {
+      if (req.file.mimetype.startsWith("image/")) {
+        fileType = "image";
+      } else if (req.file.mimetype.includes("pdf")) {
+        fileType = "document";
+      } else if (req.file.mimetype.includes("word") || req.file.mimetype.includes("document")) {
+        fileType = "document";
+      } else {
+        fileType = "other";
+      }
+    }
 
     // Add attachment to project
     project.attachments.push({

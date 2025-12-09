@@ -5,7 +5,7 @@ const streamifier = require("streamifier");
 // Configure multer to use memory storage
 const storage = multer.memoryStorage();
 
-// Configure multer
+// Configure multer for images only
 const upload = multer({
   storage: storage,
   limits: {
@@ -23,9 +23,26 @@ const upload = multer({
   },
 });
 
-// Single file upload middleware
+// Configure multer for any file type (for attachments)
+const uploadAnyFile = multer({
+  storage: storage,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB max file size for documents
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept all file types
+    cb(null, true);
+  },
+});
+
+// Single file upload middleware (images only)
 const uploadSingle = (fieldName) => {
   return upload.single(fieldName);
+};
+
+// Single file upload middleware (any file type)
+const uploadSingleFile = (fieldName) => {
+  return uploadAnyFile.single(fieldName);
 };
 
 // Multiple files upload middleware
@@ -82,11 +99,56 @@ const deleteFromCloudinary = async (imageUrl) => {
   }
 };
 
+// Helper function to upload any file to Cloudinary (raw upload for non-images)
+const uploadFileToCloudinary = (buffer, folder = "hixa", originalName) => {
+  return new Promise((resolve, reject) => {
+    // Check if it's an image
+    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(originalName);
+    
+    if (isImage) {
+      // Use image upload for images
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: folder,
+          allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
+          transformation: [{ width: 1920, height: 1080, crop: "limit" }],
+        },
+        (error, result) => {
+          if (error) {
+            reject(new Error(`فشل رفع الملف: ${error.message}`));
+          } else {
+            resolve(result.secure_url);
+          }
+        }
+      );
+      streamifier.createReadStream(buffer).pipe(uploadStream);
+    } else {
+      // Use raw upload for non-image files (PDFs, docs, etc.)
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: "raw",
+          folder: folder,
+        },
+        (error, result) => {
+          if (error) {
+            reject(new Error(`فشل رفع الملف: ${error.message}`));
+          } else {
+            resolve(result.secure_url);
+          }
+        }
+      );
+      streamifier.createReadStream(buffer).pipe(uploadStream);
+    }
+  });
+};
+
 module.exports = {
   uploadSingle,
+  uploadSingleFile,
   uploadMultiple,
   uploadFields,
   uploadToCloudinary,
+  uploadFileToCloudinary,
   deleteFromCloudinary,
 };
 

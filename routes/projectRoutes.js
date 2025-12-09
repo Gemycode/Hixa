@@ -13,7 +13,7 @@ const {
 } = require("../controllers/projectController");
 const { protect, clientOnly, adminOnly } = require("../middleware/auth");
 const { validateProject, validateProjectUpdate } = require("../middleware/validate");
-const { uploadSingle } = require("../middleware/upload");
+const { uploadSingleFile } = require("../middleware/upload");
 
 // All routes require authentication
 router.use(protect);
@@ -36,13 +36,15 @@ router.put("/:id", validateProjectUpdate, updateProject);
 // Delete project (Client can delete their own, Admin can delete any)
 router.delete("/:id", deleteProject);
 
-// Upload attachment (Client can upload to their own projects)
-router.post("/:id/attachments", uploadSingle("file"), uploadAttachment);
+// Upload attachment (Client can upload to their own projects) - accepts any file type
+router.post("/:id/attachments", uploadSingleFile("file"), uploadAttachment);
 
 // Delete attachment (Client can delete from their own projects)
 router.delete("/:id/attachments/:attachmentId", deleteAttachment);
 
 module.exports = router;
+
+
 
 
 

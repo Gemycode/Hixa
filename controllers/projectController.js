@@ -266,7 +266,10 @@ exports.uploadAttachment = async (req, res, next) => {
     const { id } = req.params;
     const { name, type } = req.body;
 
-    if (!req.file) {
+    // Handle both req.file (single) and req.files (any)
+    const file = req.file || (req.files && req.files[0]);
+    
+    if (!file) {
       return res.status(400).json({ message: "لم يتم رفع أي ملف" });
     }
 
@@ -283,16 +286,16 @@ exports.uploadAttachment = async (req, res, next) => {
 
     // Upload to Cloudinary (supports any file type)
     const folder = `hixa/projects/${id}/attachments`;
-    const fileUrl = await uploadFileToCloudinary(req.file.buffer, folder, req.file.originalname);
+    const fileUrl = await uploadFileToCloudinary(file.buffer, folder, file.originalname);
 
     // Determine file type
     let fileType = type;
     if (!fileType) {
-      if (req.file.mimetype.startsWith("image/")) {
+      if (file.mimetype.startsWith("image/")) {
         fileType = "image";
-      } else if (req.file.mimetype.includes("pdf")) {
+      } else if (file.mimetype.includes("pdf")) {
         fileType = "document";
-      } else if (req.file.mimetype.includes("word") || req.file.mimetype.includes("document")) {
+      } else if (file.mimetype.includes("word") || file.mimetype.includes("document")) {
         fileType = "document";
       } else {
         fileType = "other";
@@ -301,7 +304,7 @@ exports.uploadAttachment = async (req, res, next) => {
 
     // Add attachment to project
     project.attachments.push({
-      name: name || req.file.originalname,
+      name: name || file.originalname,
       url: fileUrl,
       type: fileType,
     });

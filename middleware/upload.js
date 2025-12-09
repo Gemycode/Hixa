@@ -41,8 +41,9 @@ const uploadSingle = (fieldName) => {
 };
 
 // Single file upload middleware (any file type)
+// Accepts any file field name
 const uploadSingleFile = (fieldName) => {
-  return uploadAnyFile.single(fieldName);
+  return uploadAnyFile.any();
 };
 
 // Multiple files upload middleware

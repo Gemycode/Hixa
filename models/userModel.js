@@ -21,7 +21,7 @@ const UserSchema = new mongoose.Schema(
 );
 
 // Index for faster queries
-UserSchema.index({ email: 1 });
+// Note: email already has unique index from schema definition, so we don't need to add it again
 UserSchema.index({ role: 1 });
 
 UserSchema.pre("save", async function (next) {

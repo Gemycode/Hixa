@@ -60,9 +60,9 @@ const SubscriberSchema = new mongoose.Schema(
 // Compound index: email and phone should be unique together, but allow nulls
 SubscriberSchema.index({ email: 1, phone: 1 }, { unique: true, sparse: true });
 
-// Index for faster queries
-SubscriberSchema.index({ email: 1 });
-SubscriberSchema.index({ phone: 1 });
+// Index for faster queries (sparse to allow nulls and avoid duplicate warnings)
+SubscriberSchema.index({ email: 1 }, { sparse: true });
+SubscriberSchema.index({ phone: 1 }, { sparse: true });
 SubscriberSchema.index({ isActive: 1 });
 SubscriberSchema.index({ subscribedAt: -1 });
 SubscriberSchema.index({ source: 1 });

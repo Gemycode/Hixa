@@ -7,6 +7,13 @@ const UserSchema = new mongoose.Schema(
     password: { type: String, required: true, select: false },
     role: { type: String, enum: ["admin", "engineer", "client", "customer"], default: "customer" },
     name: { type: String, trim: true },
+    phone: { type: String, trim: true, maxlength: 50 },
+    location: { type: String, trim: true, maxlength: 200 },
+    bio: { type: String, trim: true, maxlength: 1000 },
+    avatar: {
+      url: { type: String, trim: true },
+      uploadedAt: { type: Date, default: Date.now },
+    },
     isActive: { type: Boolean, default: true },
     lastLogin: { type: Date },
   },

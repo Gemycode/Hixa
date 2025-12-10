@@ -449,6 +449,9 @@ const validateUserUpdate = (req, res, next) => {
     email: Joi.string().pattern(emailRegex),
     password: Joi.string().pattern(passwordRegex),
     name: Joi.string().trim().max(100),
+    phone: Joi.string().trim().max(50),
+    location: Joi.string().trim().max(200),
+    bio: Joi.string().trim().max(1000),
     role: Joi.string().valid(...roles),
     isActive: Joi.boolean(),
   })

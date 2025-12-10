@@ -5,11 +5,62 @@ const sanitizeUser = (user) => ({
   email: user.email,
   name: user.name,
   role: user.role,
+  phone: user.phone,
+  location: user.location,
+  bio: user.bio,
+  avatar: user.avatar,
   isActive: user.isActive,
   lastLogin: user.lastLogin,
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
 });
+
+// Get current user's profile
+const getProfile = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: "المستخدم غير موجود" });
+    }
+    res.json({ data: sanitizeUser(user) });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update current user's profile
+const { uploadToCloudinary } = require("../middleware/upload");
+
+const updateProfile = async (req, res, next) => {
+  try {
+    const { name, email, phone, location, bio } = req.body;
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: "المستخدم غير موجود" });
+    }
+
+    if (typeof name !== "undefined") user.name = name;
+    if (typeof email !== "undefined") user.email = email;
+    if (typeof phone !== "undefined") user.phone = phone;
+    if (typeof location !== "undefined") user.location = location;
+    if (typeof bio !== "undefined") user.bio = bio;
+
+    if (req.file) {
+      const url = await uploadToCloudinary(req.file.buffer, `hixa/users/${user._id}/avatar`);
+      user.avatar = { url, uploadedAt: new Date() };
+    }
+
+    await user.save();
+
+    res.json({
+      message: "تم تحديث الملف الشخصي بنجاح",
+      data: sanitizeUser(user),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // Create new user (admin action)
 const createUser = async (req, res, next) => {
@@ -141,5 +192,7 @@ module.exports = {
   getUserById,
   updateUser,
   deleteUser,
+  getProfile,
+  updateProfile,
 };
 

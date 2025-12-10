@@ -89,6 +89,11 @@ const limiter = rateLimit({
 });
 app.use("/api", limiter);
 
+// Root API check
+app.get("/", (req, res) => {
+  res.send("HIXA API is running");
+});
+
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/content", contentRoutes);

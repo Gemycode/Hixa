@@ -180,6 +180,74 @@ exports.updateServices = async (req, res) => {
   }
 };
 
+// UPDATE single service detail (by categoryKey + sectionKey or _id)
+exports.updateServiceDetail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { categoryKey, sectionKey, title_en, title_ar, details_en, details_ar, image } = req.body;
+    let imageUrl = image;
+
+    // Handle file upload if image file is provided
+    if (req.file) {
+      imageUrl = await uploadToCloudinary(req.file.buffer, "hixa/services/details");
+      // Delete old image if exists
+      const content = await Content.findOne();
+      if (content && content.services && content.services.details) {
+        const oldDetail = content.services.details.find(
+          (d) => d._id && d._id.toString() === id
+        );
+        if (oldDetail && oldDetail.image && oldDetail.image.includes("cloudinary.com")) {
+          await deleteFromCloudinary(oldDetail.image);
+        }
+      }
+    }
+
+    const content = await Content.findOne();
+    if (!content || !content.services || !content.services.details) {
+      return res.status(404).json({ message: "تفاصيل الخدمة غير موجودة" });
+    }
+
+    // Find detail by _id or categoryKey + sectionKey
+    let detailIndex = -1;
+    if (id && mongoose.Types.ObjectId.isValid(id)) {
+      detailIndex = content.services.details.findIndex(
+        (d) => d._id && d._id.toString() === id
+      );
+    } else if (categoryKey && sectionKey) {
+      detailIndex = content.services.details.findIndex(
+        (d) => d.categoryKey === categoryKey && d.sectionKey === sectionKey
+      );
+    }
+
+    if (detailIndex === -1) {
+      return res.status(404).json({ message: "تفاصيل الخدمة غير موجودة" });
+    }
+
+    // Update fields
+    const updateFields = {};
+    if (title_en !== undefined) updateFields[`services.details.${detailIndex}.title_en`] = title_en;
+    if (title_ar !== undefined) updateFields[`services.details.${detailIndex}.title_ar`] = title_ar;
+    if (details_en !== undefined) updateFields[`services.details.${detailIndex}.details_en`] = details_en;
+    if (details_ar !== undefined) updateFields[`services.details.${detailIndex}.details_ar`] = details_ar;
+    if (imageUrl !== undefined) updateFields[`services.details.${detailIndex}.image`] = imageUrl;
+    if (categoryKey !== undefined) updateFields[`services.details.${detailIndex}.categoryKey`] = categoryKey;
+    if (sectionKey !== undefined) updateFields[`services.details.${detailIndex}.sectionKey`] = sectionKey;
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $set: updateFields },
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      message: "تم تحديث تفاصيل الخدمة بنجاح",
+      data: updated.services.details[detailIndex],
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
 // ADD new project item
 exports.addProjectItem = async (req, res) => {
   try {

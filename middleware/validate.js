@@ -132,15 +132,41 @@ const validateServices = (req, res, next) => {
               "any.only": "sectionKey يجب أن يكون section1, section2, section3, أو section4",
             }),
           categoryKey: Joi.string()
-            .valid("general", "engineering", "products")
+            .max(100)
             .optional()
             .messages({
-              "any.only": "categoryKey يجب أن يكون general, engineering, أو products",
+              "string.max": "categoryKey يجب ألا يتجاوز 100 حرف",
             }),
         })
       )
       .optional(),
   });
+
+  const { error } = schema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
+  next();
+};
+
+// Service detail validation (for single detail update)
+const validateServiceDetail = (req, res, next) => {
+  const schema = Joi.object({
+    categoryKey: Joi.string().max(100).optional(),
+    sectionKey: Joi.string()
+      .valid("section1", "section2", "section3", "section4")
+      .optional()
+      .messages({
+        "any.only": "sectionKey يجب أن يكون section1, section2, section3, أو section4",
+      }),
+    title_en: Joi.string().max(200).optional(),
+    title_ar: Joi.string().max(200).optional(),
+    details_en: Joi.string().max(5000).optional(),
+    details_ar: Joi.string().max(5000).optional(),
+    image: Joi.string().uri().allow("").optional(),
+  })
+    .min(1)
+    .messages({
+      "object.min": "يجب إرسال حقل واحد على الأقل للتحديث",
+    });
 
   const { error } = schema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
@@ -661,6 +687,7 @@ module.exports = {
   validateHero,
   validateAbout,
   validateServices,
+  validateServiceDetail,
   validateProjects,
   validateProjectItem,
   validateJobs,

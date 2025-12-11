@@ -6,6 +6,7 @@ const {
   updateHero,
   updateAbout,
   updateServices,
+  updateServiceDetail,
   updateProjects,
   addProjectItem,
   updateProjectItem,
@@ -28,6 +29,7 @@ const {
   validateHero,
   validateAbout,
   validateServices,
+  validateServiceDetail,
   validateProjects,
   validateProjectItem,
   validatePartners,
@@ -47,6 +49,8 @@ router.get("/", getContent);
 router.put("/hero", protect, adminOnly, validateHero, updateHero);
 router.put("/about", protect, adminOnly, validateAbout, updateAbout);
 router.put("/services", protect, adminOnly, validateServices, updateServices);
+// Update single service detail (by _id or categoryKey + sectionKey)
+router.put("/services/details/:id", protect, adminOnly, uploadSingle("image"), validateServiceDetail, updateServiceDetail);
 // Projects route - accepts multiple images with field names like image_0, image_1, etc.
 router.put("/projects", protect, adminOnly, (req, res, next) => {
   // Dynamically create fields array based on items count (max 20 items)

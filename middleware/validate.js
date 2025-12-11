@@ -125,8 +125,18 @@ const validateServices = (req, res, next) => {
           details_en: Joi.string().max(5000).optional(),
           details_ar: Joi.string().max(5000).optional(),
           image: Joi.string().uri().allow("").optional(),
-          sectionKey: Joi.string().max(100).optional(),
-          categoryKey: Joi.string().max(100).optional(),
+          sectionKey: Joi.string()
+            .valid("section1", "section2", "section3", "section4")
+            .optional()
+            .messages({
+              "any.only": "sectionKey يجب أن يكون section1, section2, section3, أو section4",
+            }),
+          categoryKey: Joi.string()
+            .valid("general", "engineering", "products")
+            .optional()
+            .messages({
+              "any.only": "categoryKey يجب أن يكون general, engineering, أو products",
+            }),
         })
       )
       .optional(),

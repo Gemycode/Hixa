@@ -8,6 +8,10 @@ const sanitizeUser = (user) => ({
   phone: user.phone,
   location: user.location,
   bio: user.bio,
+  specializations: user.specializations || [],
+  certifications: user.certifications || [],
+  averageRating: user.averageRating,
+  reviewsCount: user.reviewsCount,
   avatar: user.avatar,
   isActive: user.isActive,
   lastLogin: user.lastLogin,
@@ -33,7 +37,7 @@ const { uploadToCloudinary } = require("../middleware/upload");
 
 const updateProfile = async (req, res, next) => {
   try {
-    const { name, email, phone, location, bio } = req.body;
+    const { name, email, phone, location, bio, specializations, certifications } = req.body;
 
     const user = await User.findById(req.user._id);
     if (!user) {
@@ -45,6 +49,45 @@ const updateProfile = async (req, res, next) => {
     if (typeof phone !== "undefined") user.phone = phone;
     if (typeof location !== "undefined") user.location = location;
     if (typeof bio !== "undefined") user.bio = bio;
+
+    // Helper parsers
+    const parseStringArray = (val) => {
+      if (Array.isArray(val)) return val;
+      if (typeof val === "string") {
+        try {
+          const parsed = JSON.parse(val);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (_e) {
+          // fallback: comma or newline separated
+          return val
+            .split(/[,\\n]/)
+            .map((v) => v.trim())
+            .filter(Boolean);
+        }
+      }
+      return [];
+    };
+
+    const parseCertifications = (val) => {
+      if (Array.isArray(val)) return val;
+      if (typeof val === "string") {
+        try {
+          const parsed = JSON.parse(val);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (_e) {
+          return [];
+        }
+      }
+      return [];
+    };
+
+    if (typeof specializations !== "undefined") {
+      user.specializations = parseStringArray(specializations);
+    }
+
+    if (typeof certifications !== "undefined") {
+      user.certifications = parseCertifications(certifications);
+    }
 
     if (req.file) {
       const url = await uploadToCloudinary(req.file.buffer, `hixa/users/${user._id}/avatar`);

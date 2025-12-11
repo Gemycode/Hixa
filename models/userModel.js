@@ -10,6 +10,21 @@ const UserSchema = new mongoose.Schema(
     phone: { type: String, trim: true, maxlength: 50 },
     location: { type: String, trim: true, maxlength: 200 },
     bio: { type: String, trim: true, maxlength: 1000 },
+  specializations: [
+    {
+      type: String,
+      trim: true,
+      maxlength: 100,
+    },
+  ],
+  certifications: [
+    {
+      title: { type: String, trim: true, maxlength: 200 },
+      year: { type: Number, min: 1900, max: 2100 },
+    },
+  ],
+  averageRating: { type: Number, default: 0 },
+  reviewsCount: { type: Number, default: 0 },
     avatar: {
       url: { type: String, trim: true },
       uploadedAt: { type: Date, default: Date.now },

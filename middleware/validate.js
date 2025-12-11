@@ -607,6 +607,28 @@ const validateProjectUpdate = (req, res, next) => {
   next();
 };
 
+// Profile update validation (for /me) - safer, excludes role/isActive/password
+const validateProfileUpdate = (req, res, next) => {
+  const schema = Joi.object({
+    email: Joi.string().pattern(emailRegex),
+    name: Joi.string().trim().max(100),
+    phone: Joi.string().trim().max(50),
+    location: Joi.string().trim().max(200),
+    bio: Joi.string().trim().max(1000),
+  })
+    .min(1)
+    .messages({
+      "object.min": "يجب إرسال حقل واحد على الأقل للتحديث",
+    });
+
+  const { error } = schema.validate(req.body, { abortEarly: false });
+  if (error) {
+    const messages = error.details.map((detail) => detail.message).join(", ");
+    return res.status(400).json({ message: messages });
+  }
+  next();
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -624,6 +646,7 @@ module.exports = {
   validateFooter,
   validateUserCreate,
   validateUserUpdate,
+  validateProfileUpdate,
   validateSubscribe,
   validateSubscriberUpdate,
   validateProject,

@@ -11,13 +11,13 @@ const {
   updateProfile,
 } = require("../controllers/userController");
 const { protect, adminOnly } = require("../middleware/auth");
-const { validateUserCreate, validateUserUpdate } = require("../middleware/validate");
+const { validateUserCreate, validateUserUpdate, validateProfileUpdate } = require("../middleware/validate");
 const { uploadSingle } = require("../middleware/upload");
 
 // Current user profile routes
 router.use(protect);
 router.get("/me", getProfile);
-router.put("/me", uploadSingle("avatar"), validateUserUpdate, updateProfile);
+router.put("/me", uploadSingle("avatar"), validateProfileUpdate, updateProfile);
 
 // Admin routes
 router.use(adminOnly);

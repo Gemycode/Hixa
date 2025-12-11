@@ -38,6 +38,18 @@ const ContentSchema = new mongoose.Schema(
           icon: { type: String, default: "" },
         },
       ],
+      details: [
+        {
+          _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
+          title_en: { type: String, default: "" },
+          title_ar: { type: String, default: "" },
+          details_en: { type: String, default: "" },
+          details_ar: { type: String, default: "" },
+          image: { type: String, default: "" },
+          sectionKey: { type: String, default: "" }, // e.g., section1, section2
+          categoryKey: { type: String, default: "" }, // e.g., general, engineering, products
+        },
+      ],
     },
     projects: {
       title_en: { type: String, default: "" },

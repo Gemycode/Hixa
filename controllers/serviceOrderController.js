@@ -1,17 +1,11 @@
 const ServiceOrder = require("../models/serviceOrderModel");
-const { uploadToCloudinary } = require("../middleware/upload");
 
 const sanitizeServiceOrder = (order) => {
   const o = order.toObject ? order.toObject() : order;
   return {
     id: o._id,
-    serviceId: o.serviceId,
-    serviceType: o.serviceType,
-    title: o.title,
-    description: o.description,
     orderDetails: o.orderDetails,
     email: o.email,
-    image: o.image,
     status: o.status,
     isActive: o.isActive,
     createdAt: o.createdAt,
@@ -44,16 +38,14 @@ exports.getServiceOrders = async (req, res, next) => {
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
     const skip = (page - 1) * limit;
-    const { status, serviceId, serviceType, search, email } = req.query;
+    const { status, search, email } = req.query;
 
     const filters = { isActive: true };
     if (status) filters.status = status;
-    if (serviceId) filters.serviceId = serviceId;
-    if (serviceType) filters.serviceType = serviceType;
     if (email) filters.email = new RegExp(email, "i");
     if (search) {
       const regex = new RegExp(search, "i");
-      filters.$or = [{ title: regex }, { description: regex }, { orderDetails: regex }];
+      filters.$or = [{ orderDetails: regex }, { email: regex }];
     }
 
     const [orders, total] = await Promise.all([
@@ -92,25 +84,16 @@ exports.getServiceOrderById = async (req, res, next) => {
 exports.updateServiceOrder = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { serviceId, serviceType, title, description, orderDetails, email, status } = req.body;
+    const { orderDetails, email, status } = req.body;
     const order = await ServiceOrder.findById(id);
 
     if (!order || !order.isActive) {
       return res.status(404).json({ message: "طلب الخدمة غير موجود" });
     }
 
-    if (serviceId !== undefined) order.serviceId = serviceId;
-    if (serviceType !== undefined) order.serviceType = serviceType;
-    if (title !== undefined) order.title = title;
-    if (description !== undefined) order.description = description;
     if (orderDetails !== undefined) order.orderDetails = orderDetails;
     if (email !== undefined) order.email = email;
     if (status !== undefined) order.status = status;
-
-    if (req.file) {
-      const url = await uploadToCloudinary(req.file.buffer, "hixa/service-orders");
-      order.image = { url };
-    }
 
     await order.save();
 

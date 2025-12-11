@@ -116,6 +116,20 @@ const validateServices = (req, res, next) => {
         })
       )
       .optional(),
+    details: Joi.array()
+      .items(
+        Joi.object({
+          _id: Joi.string().optional(),
+          title_en: Joi.string().max(200).optional(),
+          title_ar: Joi.string().max(200).optional(),
+          details_en: Joi.string().max(5000).optional(),
+          details_ar: Joi.string().max(5000).optional(),
+          image: Joi.string().uri().allow("").optional(),
+          sectionKey: Joi.string().max(100).optional(),
+          categoryKey: Joi.string().max(100).optional(),
+        })
+      )
+      .optional(),
   });
 
   const { error } = schema.validate(req.body);

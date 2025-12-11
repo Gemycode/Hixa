@@ -10,16 +10,15 @@ const {
 } = require("../controllers/serviceOrderController");
 const { protect, adminOnly } = require("../middleware/auth");
 const { validateServiceOrderCreate, validateServiceOrderUpdate } = require("../middleware/validate");
-const { uploadSingle } = require("../middleware/upload");
 
 // Public submit (landing modal)
-router.post("/", uploadSingle("image"), validateServiceOrderCreate, createServiceOrder);
+router.post("/", validateServiceOrderCreate, createServiceOrder);
 
 // Admin management
 router.use(protect, adminOnly);
 router.get("/", getServiceOrders);
 router.get("/:id", getServiceOrderById);
-router.put("/:id", uploadSingle("image"), validateServiceOrderUpdate, updateServiceOrder);
+router.put("/:id", validateServiceOrderUpdate, updateServiceOrder);
 router.delete("/:id", deleteServiceOrder);
 
 module.exports = router;

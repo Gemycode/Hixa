@@ -141,14 +141,28 @@ exports.updateAbout = async (req, res) => {
 // UPDATE services section
 exports.updateServices = async (req, res) => {
   try {
-    const { title_en, title_ar, subtitle_en, subtitle_ar, items } = req.body;
+    const { title_en, title_ar, subtitle_en, subtitle_ar, items, details } = req.body;
+
+    const parseArray = (val, fallback = []) => {
+      if (Array.isArray(val)) return val;
+      if (typeof val === "string") {
+        try {
+          const parsed = JSON.parse(val);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {
+          return fallback;
+        }
+      }
+      return fallback;
+    };
 
     const updateFields = {
       "services.title_en": title_en,
       "services.title_ar": title_ar,
       "services.subtitle_en": subtitle_en,
       "services.subtitle_ar": subtitle_ar,
-      "services.items": items || [],
+      "services.items": parseArray(items, []),
+      "services.details": parseArray(details, []),
     };
 
     const updated = await Content.findOneAndUpdate(

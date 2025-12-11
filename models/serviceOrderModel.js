@@ -2,26 +2,6 @@ const mongoose = require("mongoose");
 
 const ServiceOrderSchema = new mongoose.Schema(
   {
-    serviceId: {
-      type: String,
-      trim: true,
-      maxlength: 200,
-    },
-    serviceType: {
-      type: String,
-      trim: true,
-      maxlength: 200,
-    },
-    title: {
-      type: String,
-      trim: true,
-      maxlength: 200,
-    },
-    description: {
-      type: String,
-      trim: true,
-      maxlength: 5000,
-    },
     orderDetails: {
       type: String,
       required: true,
@@ -34,10 +14,6 @@ const ServiceOrderSchema = new mongoose.Schema(
       trim: true,
       maxlength: 200,
       match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-    },
-    image: {
-      url: { type: String, trim: true },
-      uploadedAt: { type: Date, default: Date.now },
     },
     status: {
       type: String,
@@ -52,8 +28,6 @@ const ServiceOrderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-ServiceOrderSchema.index({ serviceId: 1 });
-ServiceOrderSchema.index({ serviceType: 1 });
 ServiceOrderSchema.index({ status: 1 });
 ServiceOrderSchema.index({ email: 1 });
 ServiceOrderSchema.index({ createdAt: -1 });

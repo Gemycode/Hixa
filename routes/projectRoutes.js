@@ -4,6 +4,7 @@ const router = express.Router();
 const {
   createProject,
   getProjects,
+  getProjectsByCategory,
   getProjectById,
   updateProject,
   deleteProject,
@@ -23,6 +24,9 @@ router.get("/statistics", getProjectStatistics);
 
 // Get all projects (filtered by role)
 router.get("/", getProjects);
+
+// Get projects by category
+router.get("/category/:category", getProjectsByCategory);
 
 // Get single project
 router.get("/:id", getProjectById);

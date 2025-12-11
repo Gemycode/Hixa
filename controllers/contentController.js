@@ -156,14 +156,80 @@ exports.updateServices = async (req, res) => {
       return fallback;
     };
 
-    const updateFields = {
-      "services.title_en": title_en,
-      "services.title_ar": title_ar,
-      "services.subtitle_en": subtitle_en,
-      "services.subtitle_ar": subtitle_ar,
-      "services.items": parseArray(items, []),
-      "services.details": parseArray(details, []),
-    };
+    const content = await Content.findOne();
+    if (!content) {
+      // If no content exists, create new one
+      const updateFields = {
+        "services.title_en": title_en,
+        "services.title_ar": title_ar,
+        "services.subtitle_en": subtitle_en,
+        "services.subtitle_ar": subtitle_ar,
+        "services.items": parseArray(items, []),
+        "services.details": parseArray(details, []),
+      };
+
+      const updated = await Content.findOneAndUpdate(
+        {},
+        { $set: updateFields },
+        { new: true, upsert: true, runValidators: true }
+      );
+
+      return res.json({
+        message: "تم تحديث services بنجاح",
+        data: updated.services,
+      });
+    }
+
+    // Update title/subtitle if provided
+    const updateFields = {};
+    if (title_en !== undefined) updateFields["services.title_en"] = title_en;
+    if (title_ar !== undefined) updateFields["services.title_ar"] = title_ar;
+    if (subtitle_en !== undefined) updateFields["services.subtitle_en"] = subtitle_en;
+    if (subtitle_ar !== undefined) updateFields["services.subtitle_ar"] = subtitle_ar;
+
+    // Update items if provided
+    if (items !== undefined) {
+      const itemsArray = parseArray(items, []);
+      const existingItems = content.services?.items || [];
+      const updatedItems = [...existingItems]; // Copy existing items
+
+      // Update existing items or add new ones
+      itemsArray.forEach((item) => {
+        if (item._id && mongoose.Types.ObjectId.isValid(item._id)) {
+          // Update existing item
+          const itemIndex = updatedItems.findIndex(
+            (existing) => existing._id && existing._id.toString() === item._id
+          );
+          if (itemIndex !== -1) {
+            // Update fields in the copied array
+            if (item.title_en !== undefined) updatedItems[itemIndex].title_en = item.title_en;
+            if (item.title_ar !== undefined) updatedItems[itemIndex].title_ar = item.title_ar;
+            if (item.description_en !== undefined) updatedItems[itemIndex].description_en = item.description_en;
+            if (item.description_ar !== undefined) updatedItems[itemIndex].description_ar = item.description_ar;
+            if (item.icon !== undefined) updatedItems[itemIndex].icon = item.icon;
+          }
+        } else {
+          // Add new item (if _id not provided or invalid)
+          const newItem = {
+            _id: new mongoose.Types.ObjectId(),
+            title_en: item.title_en || "",
+            title_ar: item.title_ar || "",
+            description_en: item.description_en || "",
+            description_ar: item.description_ar || "",
+            icon: item.icon || "",
+          };
+          updatedItems.push(newItem);
+        }
+      });
+
+      // Set the updated items array
+      updateFields["services.items"] = updatedItems;
+    }
+
+    // Update details if provided
+    if (details !== undefined) {
+      updateFields["services.details"] = parseArray(details, []);
+    }
 
     const updated = await Content.findOneAndUpdate(
       {},
@@ -174,6 +240,113 @@ exports.updateServices = async (req, res) => {
     res.json({
       message: "تم تحديث services بنجاح",
       data: updated.services,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// ADD service item
+exports.addServiceItem = async (req, res) => {
+  try {
+    const { title_en, title_ar, description_en, description_ar, icon } = req.body;
+
+    const newItem = {
+      _id: new mongoose.Types.ObjectId(),
+      title_en: title_en || "",
+      title_ar: title_ar || "",
+      description_en: description_en || "",
+      description_ar: description_ar || "",
+      icon: icon || "",
+    };
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $push: { "services.items": newItem } },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    const addedItem = updated.services.items[updated.services.items.length - 1];
+    res.json({
+      message: "تم إضافة الخدمة بنجاح",
+      data: addedItem,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// UPDATE service item by ID
+exports.updateServiceItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "معرف الخدمة غير صحيح" });
+    }
+
+    const { title_en, title_ar, description_en, description_ar, icon } = req.body;
+
+    const content = await Content.findOne();
+    if (!content || !content.services || !content.services.items) {
+      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    }
+
+    const itemIndex = content.services.items.findIndex((item) => item._id && item._id.toString() === id);
+    if (itemIndex === -1) {
+      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    }
+
+    const updateFields = {};
+    if (title_en !== undefined) updateFields[`services.items.${itemIndex}.title_en`] = title_en;
+    if (title_ar !== undefined) updateFields[`services.items.${itemIndex}.title_ar`] = title_ar;
+    if (description_en !== undefined) updateFields[`services.items.${itemIndex}.description_en`] = description_en;
+    if (description_ar !== undefined) updateFields[`services.items.${itemIndex}.description_ar`] = description_ar;
+    if (icon !== undefined) updateFields[`services.items.${itemIndex}.icon`] = icon;
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $set: updateFields },
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      message: "تم تحديث الخدمة بنجاح",
+      data: updated.services.items[itemIndex],
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// DELETE service item by ID
+exports.deleteServiceItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "معرف الخدمة غير صحيح" });
+    }
+
+    const content = await Content.findOne();
+    if (!content || !content.services || !content.services.items) {
+      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    }
+
+    const item = content.services.items.find((item) => item._id && item._id.toString() === id);
+    if (!item) {
+      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    }
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $pull: { "services.items": { _id: new mongoose.Types.ObjectId(id) } } },
+      { new: true }
+    );
+
+    res.json({
+      message: "تم حذف الخدمة بنجاح",
+      data: updated.services.items,
     });
   } catch (err) {
     res.status(500).json({ message: "خطأ في الخادم", error: err.message });
@@ -725,283 +898,6 @@ exports.addJobItem = async (req, res) => {
       link: link || "",
       isActive:
         isActive === undefined ? true : typeof isActive === "boolean" ? isActive : isActive === "true",
-    };
-
-    const updated = await Content.findOneAndUpdate(
-      {},
-      { $push: { "jobs.items": newItem } },
-      { new: true, upsert: true, runValidators: true }
-    );
-
-    const addedItem = updated.jobs.items[updated.jobs.items.length - 1];
-    res.json({
-      message: "تم إضافة الوظيفة بنجاح",
-      data: addedItem,
-    });
-  } catch (err) {
-    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
-  }
-};
-
-// UPDATE job item by ID
-exports.updateJobItem = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "معرف الوظيفة غير صحيح" });
-    }
-
-    const { title_en, title_ar, description_en, description_ar, link, isActive } = req.body;
-
-    const content = await Content.findOne();
-    if (!content || !content.jobs || !content.jobs.items) {
-      return res.status(404).json({ message: "الوظيفة غير موجودة" });
-    }
-
-    const itemIndex = content.jobs.items.findIndex((item) => item._id && item._id.toString() === id);
-    if (itemIndex === -1) {
-      return res.status(404).json({ message: "الوظيفة غير موجودة" });
-    }
-
-    const updateFields = {};
-    if (title_en !== undefined) updateFields[`jobs.items.${itemIndex}.title_en`] = title_en;
-    if (title_ar !== undefined) updateFields[`jobs.items.${itemIndex}.title_ar`] = title_ar;
-    if (description_en !== undefined) updateFields[`jobs.items.${itemIndex}.description_en`] = description_en;
-    if (description_ar !== undefined) updateFields[`jobs.items.${itemIndex}.description_ar`] = description_ar;
-    if (link !== undefined) updateFields[`jobs.items.${itemIndex}.link`] = link;
-    if (isActive !== undefined) {
-      updateFields[`jobs.items.${itemIndex}.isActive`] =
-        typeof isActive === "boolean" ? isActive : isActive === "true";
-    }
-
-    const updated = await Content.findOneAndUpdate(
-      {},
-      { $set: updateFields },
-      { new: true, runValidators: true }
-    );
-
-    res.json({
-      message: "تم تحديث الوظيفة بنجاح",
-      data: updated.jobs.items[itemIndex],
-    });
-  } catch (err) {
-    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
-  }
-};
-
-// DELETE job item by ID
-exports.deleteJobItem = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "معرف الوظيفة غير صحيح" });
-    }
-
-    const updated = await Content.findOneAndUpdate(
-      {},
-      { $pull: { "jobs.items": { _id: new mongoose.Types.ObjectId(id) } } },
-      { new: true }
-    );
-
-    if (!updated) {
-      return res.status(404).json({ message: "الوظيفة غير موجودة" });
-    }
-
-    res.json({
-      message: "تم حذف الوظيفة بنجاح",
-      data: updated.jobs.items,
-    });
-  } catch (err) {
-    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
-  }
-};
-
-// UPDATE CTA section
-exports.updateCTA = async (req, res) => {
-  const { title_en, title_ar, subtitle_en, subtitle_ar, buttonText_en, buttonText_ar, buttonLink } = req.body;
-  await updateSection("cta", {
-    title_en,
-    title_ar,
-    subtitle_en,
-    subtitle_ar,
-    buttonText_en,
-    buttonText_ar,
-    buttonLink,
-  }, res);
-};
-
-// UPDATE footer section
-exports.updateFooter = async (req, res) => {
-  try {
-    const { description_en, description_ar, copyright_en, copyright_ar, links, social, contact } = req.body;
-
-    const updateFields = {
-      "footer.description_en": description_en,
-      "footer.description_ar": description_ar,
-      "footer.copyright_en": copyright_en,
-      "footer.copyright_ar": copyright_ar,
-      "footer.links": links || [],
-      "footer.social": social || [],
-      "footer.contact": contact || {},
-    };
-
-    const updated = await Content.findOneAndUpdate(
-      {},
-      { $set: updateFields },
-      { new: true, upsert: true, runValidators: true }
-    );
-
-    res.json({
-      message: "تم تحديث footer بنجاح",
-      data: updated.footer,
-    });
-  } catch (err) {
-    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
-  }
-};
-
-// Upload single image
-exports.uploadImage = async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: "لم يتم رفع أي صورة" });
-    }
-
-    const folder = req.body.folder || "hixa";
-    const imageUrl = await uploadToCloudinary(req.file.buffer, folder);
-
-    res.json({
-      message: "تم رفع الصورة بنجاح",
-      url: imageUrl,
-    });
-  } catch (err) {
-    res.status(500).json({ message: "خطأ في رفع الصورة", error: err.message });
-  }
-};
-
-// DELETE partner item by ID
-exports.deletePartnerItem = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "معرف الشريك غير صحيح" });
-    }
-
-    const content = await Content.findOne();
-    if (!content || !content.partners || !content.partners.items) {
-      return res.status(404).json({ message: "الشريك غير موجود" });
-    }
-
-    const item = content.partners.items.find((partner) => partner._id && partner._id.toString() === id);
-    if (!item) {
-      return res.status(404).json({ message: "الشريك غير موجود" });
-    }
-
-    if (item.logo && item.logo.includes("cloudinary.com")) {
-      await deleteFromCloudinary(item.logo);
-    }
-
-    const updated = await Content.findOneAndUpdate(
-      {},
-      { $pull: { "partners.items": { _id: new mongoose.Types.ObjectId(id) } } },
-      { new: true }
-    );
-
-    res.json({
-      message: "تم حذف الشريك بنجاح",
-      data: updated.partners.items,
-    });
-  } catch (err) {
-    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
-  }
-};
-
-// UPDATE features section
-exports.updateFeatures = async (req, res) => {
-  try {
-    const { title_en, title_ar, subtitle_en, subtitle_ar, items } = req.body;
-
-    const updateFields = {
-      "features.title_en": title_en,
-      "features.title_ar": title_ar,
-      "features.subtitle_en": subtitle_en,
-      "features.subtitle_ar": subtitle_ar,
-      "features.items": items || [],
-    };
-
-    const updated = await Content.findOneAndUpdate(
-      {},
-      { $set: updateFields },
-      { new: true, upsert: true, runValidators: true }
-    );
-
-    res.json({
-      message: "تم تحديث features بنجاح",
-      data: updated.features,
-    });
-  } catch (err) {
-    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
-  }
-};
-
-// UPDATE jobs section
-exports.updateJobs = async (req, res) => {
-  try {
-    const { title_en, title_ar, subtitle_en, subtitle_ar, items } = req.body;
-
-    const normalizedItems = Array.isArray(items)
-      ? items.map((item) => ({
-          title_en: item.title_en || "",
-          title_ar: item.title_ar || "",
-          description_en: item.description_en || "",
-          description_ar: item.description_ar || "",
-          link: item.link || "",
-          isActive:
-            typeof item.isActive === "boolean"
-              ? item.isActive
-              : item.isActive === "true" || item.isActive === true,
-        }))
-      : [];
-
-    const updateFields = {
-      "jobs.title_en": title_en,
-      "jobs.title_ar": title_ar,
-      "jobs.subtitle_en": subtitle_en,
-      "jobs.subtitle_ar": subtitle_ar,
-      "jobs.items": normalizedItems,
-    };
-
-    const updated = await Content.findOneAndUpdate(
-      {},
-      { $set: updateFields },
-      { new: true, upsert: true, runValidators: true }
-    );
-
-    res.json({
-      message: "تم تحديث jobs بنجاح",
-      data: updated.jobs,
-    });
-  } catch (err) {
-    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
-  }
-};
-
-// ADD job item
-exports.addJobItem = async (req, res) => {
-  try {
-    const { title_en, title_ar, description_en, description_ar, link, isActive } = req.body;
-
-    const newItem = {
-      _id: new mongoose.Types.ObjectId(),
-      title_en: title_en || "",
-      title_ar: title_ar || "",
-      description_en: description_en || "",
-      description_ar: description_ar || "",
-      link: link || "",
-      isActive: typeof isActive === "boolean" ? isActive : isActive === "true",
     };
 
     const updated = await Content.findOneAndUpdate(

@@ -108,6 +108,7 @@ const validateServices = (req, res, next) => {
     items: Joi.array()
       .items(
         Joi.object({
+          _id: Joi.string().optional(), // Allow _id for existing items
           title_en: Joi.string().max(200).optional(),
           title_ar: Joi.string().max(200).optional(),
           description_en: Joi.string().max(1000).optional(),
@@ -264,6 +265,23 @@ const validatePartners = (req, res, next) => {
     title_ar: Joi.string().max(200).optional(),
     subtitle_en: Joi.string().max(1000).optional(),
     subtitle_ar: Joi.string().max(1000).optional(),
+  });
+
+  const { error } = schema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
+  next();
+};
+
+// Service item validation
+const validateServiceItem = (req, res, next) => {
+  const schema = Joi.object({
+    title_en: Joi.string().max(200).optional(),
+    title_ar: Joi.string().max(200).optional(),
+    description_en: Joi.string().max(1000).optional(),
+    description_ar: Joi.string().max(1000).optional(),
+    icon: Joi.string().allow("").optional(),
+  }).min(1).messages({
+    "object.min": "يجب إرسال حقل واحد على الأقل",
   });
 
   const { error } = schema.validate(req.body);
@@ -687,6 +705,7 @@ module.exports = {
   validateHero,
   validateAbout,
   validateServices,
+  validateServiceItem,
   validateServiceDetail,
   validateProjects,
   validateProjectItem,

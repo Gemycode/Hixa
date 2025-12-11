@@ -6,6 +6,9 @@ const {
   updateHero,
   updateAbout,
   updateServices,
+  addServiceItem,
+  updateServiceItem,
+  deleteServiceItem,
   updateServiceDetail,
   updateProjects,
   addProjectItem,
@@ -29,6 +32,7 @@ const {
   validateHero,
   validateAbout,
   validateServices,
+  validateServiceItem,
   validateServiceDetail,
   validateProjects,
   validateProjectItem,
@@ -49,6 +53,10 @@ router.get("/", getContent);
 router.put("/hero", protect, adminOnly, validateHero, updateHero);
 router.put("/about", protect, adminOnly, validateAbout, updateAbout);
 router.put("/services", protect, adminOnly, validateServices, updateServices);
+// Service items CRUD operations
+router.post("/services/items", protect, adminOnly, validateServiceItem, addServiceItem);
+router.put("/services/items/:id", protect, adminOnly, validateServiceItem, updateServiceItem);
+router.delete("/services/items/:id", protect, adminOnly, deleteServiceItem);
 // Update single service detail (by _id or categoryKey + sectionKey)
 router.put("/services/details/:id", protect, adminOnly, uploadSingle("image"), validateServiceDetail, updateServiceDetail);
 // Projects route - accepts multiple images with field names like image_0, image_1, etc.

@@ -184,23 +184,13 @@ exports.updateServices = async (req, res) => {
 exports.updateServiceDetail = async (req, res) => {
   try {
     const { id } = req.params;
-    const { categoryKey, sectionKey, title_en, title_ar, details_en, details_ar, image } = req.body;
+    const { categoryKey: bodyCategoryKey, sectionKey: bodySectionKey, title_en, title_ar, details_en, details_ar, image } = req.body;
+    const { categoryKey: paramCategoryKey, sectionKey: paramSectionKey } = req.query;
+    
+    // Use categoryKey and sectionKey from query params or body
+    const categoryKey = paramCategoryKey || bodyCategoryKey;
+    const sectionKey = paramSectionKey || bodySectionKey;
     let imageUrl = image;
-
-    // Handle file upload if image file is provided
-    if (req.file) {
-      imageUrl = await uploadToCloudinary(req.file.buffer, "hixa/services/details");
-      // Delete old image if exists
-      const content = await Content.findOne();
-      if (content && content.services && content.services.details) {
-        const oldDetail = content.services.details.find(
-          (d) => d._id && d._id.toString() === id
-        );
-        if (oldDetail && oldDetail.image && oldDetail.image.includes("cloudinary.com")) {
-          await deleteFromCloudinary(oldDetail.image);
-        }
-      }
-    }
 
     const content = await Content.findOne();
     if (!content || !content.services || !content.services.details) {
@@ -220,7 +210,21 @@ exports.updateServiceDetail = async (req, res) => {
     }
 
     if (detailIndex === -1) {
-      return res.status(404).json({ message: "تفاصيل الخدمة غير موجودة" });
+      return res.status(404).json({ 
+        message: "تفاصيل الخدمة غير موجودة",
+        hint: "تأكد من إرسال _id صحيح أو categoryKey + sectionKey في query params أو body"
+      });
+    }
+
+    const currentDetail = content.services.details[detailIndex];
+
+    // Handle file upload if image file is provided
+    if (req.file) {
+      imageUrl = await uploadToCloudinary(req.file.buffer, "hixa/services/details");
+      // Delete old image if exists
+      if (currentDetail.image && currentDetail.image.includes("cloudinary.com")) {
+        await deleteFromCloudinary(currentDetail.image);
+      }
     }
 
     // Update fields

@@ -150,6 +150,15 @@ const validateServices = (req, res, next) => {
 
 // Service detail validation (for single detail update)
 const validateServiceDetail = (req, res, next) => {
+  // Check if file is uploaded (counts as a field)
+  const hasFile = !!req.file;
+  
+  // If file is uploaded, skip body validation (file counts as a field)
+  if (hasFile) {
+    return next();
+  }
+  
+  // Otherwise, validate body fields
   const schema = Joi.object({
     categoryKey: Joi.string().max(100).optional(),
     sectionKey: Joi.string()

@@ -190,39 +190,103 @@ exports.updateServices = async (req, res) => {
     // Update items if provided
     if (items !== undefined) {
       const itemsArray = parseArray(items, []);
+      const existingItems = content.services?.items || [];
+      const updatedItems = existingItems.map(item => ({ ...item })); // Deep copy to avoid mutation
       
-      // Replace all items with the new array (preserve _id if provided and valid)
-      const finalItems = itemsArray.map((item) => {
+      // Update existing items or add new ones (don't replace all)
+      itemsArray.forEach((item) => {
         if (item._id && mongoose.Types.ObjectId.isValid(item._id)) {
-          // Keep existing _id
-          return {
-            _id: new mongoose.Types.ObjectId(item._id),
-            title_en: item.title_en || "",
-            title_ar: item.title_ar || "",
-            description_en: item.description_en || "",
-            description_ar: item.description_ar || "",
-            icon: item.icon || "",
-          };
+          // Update existing item
+          const itemIndex = updatedItems.findIndex(
+            (existing) => existing._id && existing._id.toString() === item._id
+          );
+          
+          if (itemIndex !== -1) {
+            // Update fields in the copied array
+            if (item.title_en !== undefined) updatedItems[itemIndex].title_en = item.title_en;
+            if (item.title_ar !== undefined) updatedItems[itemIndex].title_ar = item.title_ar;
+            if (item.description_en !== undefined) updatedItems[itemIndex].description_en = item.description_en;
+            if (item.description_ar !== undefined) updatedItems[itemIndex].description_ar = item.description_ar;
+            if (item.icon !== undefined) updatedItems[itemIndex].icon = item.icon;
+          }
         } else {
-          // Generate new _id
-          return {
-            _id: new mongoose.Types.ObjectId(),
-            title_en: item.title_en || "",
-            title_ar: item.title_ar || "",
-            description_en: item.description_en || "",
-            description_ar: item.description_ar || "",
-            icon: item.icon || "",
-          };
+          // Only add new item if we have less than 4 items
+          if (updatedItems.length < 4) {
+            const newItem = {
+              _id: new mongoose.Types.ObjectId(),
+              title_en: item.title_en || "",
+              title_ar: item.title_ar || "",
+              description_en: item.description_en || "",
+              description_ar: item.description_ar || "",
+              icon: item.icon || "",
+            };
+            updatedItems.push(newItem);
+          }
         }
       });
       
-      // Replace all items (this will set services.items to exactly what's in finalItems)
-      updateFields["services.items"] = finalItems;
+      // Update only the items that were modified (use $set for individual fields)
+      // But we need to set the entire array to preserve order
+      updateFields["services.items"] = updatedItems;
     }
 
     // Update details if provided
     if (details !== undefined) {
-      updateFields["services.details"] = parseArray(details, []);
+      const detailsArray = parseArray(details, []);
+      const existingDetails = content.services?.details || [];
+      const updatedDetails = existingDetails.map(detail => ({ ...detail })); // Deep copy
+      
+      // Update existing details or add new ones (don't replace all)
+      detailsArray.forEach((detail) => {
+        if (detail._id && mongoose.Types.ObjectId.isValid(detail._id)) {
+          // Update existing detail by _id
+          const detailIndex = updatedDetails.findIndex(
+            (existing) => existing._id && existing._id.toString() === detail._id
+          );
+          
+          if (detailIndex !== -1) {
+            if (detail.title_en !== undefined) updatedDetails[detailIndex].title_en = detail.title_en;
+            if (detail.title_ar !== undefined) updatedDetails[detailIndex].title_ar = detail.title_ar;
+            if (detail.details_en !== undefined) updatedDetails[detailIndex].details_en = detail.details_en;
+            if (detail.details_ar !== undefined) updatedDetails[detailIndex].details_ar = detail.details_ar;
+            if (detail.image !== undefined) updatedDetails[detailIndex].image = detail.image;
+            if (detail.sectionKey !== undefined) updatedDetails[detailIndex].sectionKey = detail.sectionKey;
+            if (detail.categoryKey !== undefined) updatedDetails[detailIndex].categoryKey = detail.categoryKey;
+          }
+        } else if (detail.categoryKey && detail.sectionKey) {
+          // Update existing detail by categoryKey + sectionKey
+          const detailIndex = updatedDetails.findIndex(
+            (existing) => existing.categoryKey === detail.categoryKey && existing.sectionKey === detail.sectionKey
+          );
+          
+          if (detailIndex !== -1) {
+            if (detail.title_en !== undefined) updatedDetails[detailIndex].title_en = detail.title_en;
+            if (detail.title_ar !== undefined) updatedDetails[detailIndex].title_ar = detail.title_ar;
+            if (detail.details_en !== undefined) updatedDetails[detailIndex].details_en = detail.details_en;
+            if (detail.details_ar !== undefined) updatedDetails[detailIndex].details_ar = detail.details_ar;
+            if (detail.image !== undefined) updatedDetails[detailIndex].image = detail.image;
+            if (detail.sectionKey !== undefined) updatedDetails[detailIndex].sectionKey = detail.sectionKey;
+            if (detail.categoryKey !== undefined) updatedDetails[detailIndex].categoryKey = detail.categoryKey;
+          }
+        } else {
+          // Add new detail only if categoryKey and sectionKey are provided
+          if (detail.categoryKey && detail.sectionKey) {
+            const newDetail = {
+              _id: new mongoose.Types.ObjectId(),
+              title_en: detail.title_en || "",
+              title_ar: detail.title_ar || "",
+              details_en: detail.details_en || "",
+              details_ar: detail.details_ar || "",
+              image: detail.image || "",
+              sectionKey: detail.sectionKey,
+              categoryKey: detail.categoryKey,
+            };
+            updatedDetails.push(newDetail);
+          }
+        }
+      });
+      
+      updateFields["services.details"] = updatedDetails;
     }
 
     const updated = await Content.findOneAndUpdate(

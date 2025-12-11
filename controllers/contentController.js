@@ -190,27 +190,22 @@ exports.updateServices = async (req, res) => {
     // Update items if provided
     if (items !== undefined) {
       const itemsArray = parseArray(items, []);
-      const existingItems = content.services?.items || [];
-      const updatedItems = [...existingItems]; // Copy existing items
-
-      // Update existing items or add new ones
-      itemsArray.forEach((item) => {
+      
+      // Replace all items with the new array (preserve _id if provided and valid)
+      const finalItems = itemsArray.map((item) => {
         if (item._id && mongoose.Types.ObjectId.isValid(item._id)) {
-          // Update existing item
-          const itemIndex = updatedItems.findIndex(
-            (existing) => existing._id && existing._id.toString() === item._id
-          );
-          if (itemIndex !== -1) {
-            // Update fields in the copied array
-            if (item.title_en !== undefined) updatedItems[itemIndex].title_en = item.title_en;
-            if (item.title_ar !== undefined) updatedItems[itemIndex].title_ar = item.title_ar;
-            if (item.description_en !== undefined) updatedItems[itemIndex].description_en = item.description_en;
-            if (item.description_ar !== undefined) updatedItems[itemIndex].description_ar = item.description_ar;
-            if (item.icon !== undefined) updatedItems[itemIndex].icon = item.icon;
-          }
+          // Keep existing _id
+          return {
+            _id: new mongoose.Types.ObjectId(item._id),
+            title_en: item.title_en || "",
+            title_ar: item.title_ar || "",
+            description_en: item.description_en || "",
+            description_ar: item.description_ar || "",
+            icon: item.icon || "",
+          };
         } else {
-          // Add new item (if _id not provided or invalid)
-          const newItem = {
+          // Generate new _id
+          return {
             _id: new mongoose.Types.ObjectId(),
             title_en: item.title_en || "",
             title_ar: item.title_ar || "",
@@ -218,12 +213,11 @@ exports.updateServices = async (req, res) => {
             description_ar: item.description_ar || "",
             icon: item.icon || "",
           };
-          updatedItems.push(newItem);
         }
       });
-
-      // Set the updated items array
-      updateFields["services.items"] = updatedItems;
+      
+      // Replace all items (this will set services.items to exactly what's in finalItems)
+      updateFields["services.items"] = finalItems;
     }
 
     // Update details if provided

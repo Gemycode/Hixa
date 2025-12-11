@@ -377,15 +377,8 @@ const validateWorkUpdate = (req, res, next) => {
 // Service Order validation (landing services)
 const validateServiceOrderCreate = (req, res, next) => {
   const schema = Joi.object({
-    serviceId: Joi.string().trim().max(200).optional(), // Optional - will be auto-determined if not provided
-    serviceType: Joi.string().trim().max(200).optional(),
-    title: Joi.string().trim().max(200).required(),
-    description: Joi.string().trim().max(5000).optional(),
-    orderDetails: Joi.string().trim().max(5000).optional(),
     email: Joi.string().email({ tlds: { allow: false } }).required(),
-    status: Joi.string()
-      .valid("New", "In Review", "Processing", "Completed", "Cancelled")
-      .optional(),
+    orderDetails: Joi.string().trim().max(5000).required(),
   });
 
   const { error } = schema.validate(req.body, { abortEarly: false });
@@ -398,12 +391,8 @@ const validateServiceOrderCreate = (req, res, next) => {
 
 const validateServiceOrderUpdate = (req, res, next) => {
   const schema = Joi.object({
-    serviceId: Joi.string().trim().max(200).optional(),
-    serviceType: Joi.string().trim().max(200).optional(),
-    title: Joi.string().trim().max(200).optional(),
-    description: Joi.string().trim().max(5000).optional(),
-    orderDetails: Joi.string().trim().max(5000).optional(),
     email: Joi.string().email({ tlds: { allow: false } }).optional(),
+    orderDetails: Joi.string().trim().max(5000).optional(),
     status: Joi.string()
       .valid("New", "In Review", "Processing", "Completed", "Cancelled")
       .optional(),
@@ -615,6 +604,19 @@ const validateProfileUpdate = (req, res, next) => {
     phone: Joi.string().trim().max(50),
     location: Joi.string().trim().max(200),
     bio: Joi.string().trim().max(1000),
+    specializations: Joi.alternatives().try(
+      Joi.array().items(Joi.string().trim().max(100)),
+      Joi.string() // will be parsed in controller (JSON / comma / newline)
+    ),
+    certifications: Joi.alternatives().try(
+      Joi.array().items(
+        Joi.object({
+          title: Joi.string().trim().max(200).required(),
+          year: Joi.number().integer().min(1900).max(2100).required(),
+        })
+      ),
+      Joi.string() // will be parsed in controller (JSON string)
+    ),
   })
     .min(1)
     .messages({

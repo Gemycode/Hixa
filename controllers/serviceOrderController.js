@@ -19,48 +19,14 @@ const sanitizeServiceOrder = (order) => {
   };
 };
 
-// Public: create a service order (landing modal form)
+// Public: create a service order (landing modal form) - minimal fields
 exports.createServiceOrder = async (req, res, next) => {
   try {
-    const { serviceId, serviceType, title, description, orderDetails, email } = req.body;
-
-    // If serviceId is not provided, try to find it from serviceType
-    let finalServiceId = serviceId;
-    if (!finalServiceId && serviceType) {
-      // Try to find service by serviceType (fallback)
-      const Content = require("../models/contentModel");
-      const content = await Content.findOne();
-      if (content && content.services && content.services.items) {
-        const service = content.services.items.find(
-          (item) =>
-            item.title_en?.toLowerCase().includes(serviceType.toLowerCase()) ||
-            item.title_ar?.toLowerCase().includes(serviceType.toLowerCase())
-        );
-        if (service && service._id) {
-          finalServiceId = service._id.toString();
-        }
-      }
-    }
-
-    // If still no serviceId, use serviceType as fallback
-    if (!finalServiceId) {
-      finalServiceId = serviceType || "unknown";
-    }
-
-    let imagePayload = undefined;
-    if (req.file) {
-      const url = await uploadToCloudinary(req.file.buffer, "hixa/service-orders");
-      imagePayload = { url };
-    }
+    const { email, orderDetails } = req.body;
 
     const order = await ServiceOrder.create({
-      serviceId: finalServiceId,
-      serviceType,
-      title,
-      description,
-      orderDetails,
       email,
-      image: imagePayload,
+      orderDetails,
     });
 
     res.status(201).json({

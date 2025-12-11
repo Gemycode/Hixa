@@ -4,7 +4,6 @@ const ServiceOrderSchema = new mongoose.Schema(
   {
     serviceId: {
       type: String,
-      required: true, // Will be auto-determined in controller if not provided
       trim: true,
       maxlength: 200,
     },
@@ -15,7 +14,6 @@ const ServiceOrderSchema = new mongoose.Schema(
     },
     title: {
       type: String,
-      required: true,
       trim: true,
       maxlength: 200,
     },
@@ -26,6 +24,7 @@ const ServiceOrderSchema = new mongoose.Schema(
     },
     orderDetails: {
       type: String,
+      required: true,
       trim: true,
       maxlength: 5000,
     },

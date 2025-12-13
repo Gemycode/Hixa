@@ -882,9 +882,14 @@ exports.getServiceItem = async (req, res) => {
 // GET service details by service ID
 exports.getServiceDetails = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { serviceId } = req.params; // Get serviceId from URL parameter
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    // Validate that serviceId is provided and not empty
+    if (!serviceId || serviceId.trim() === "") {
+      return res.status(400).json({ message: "معرف الخدمة مطلوب" });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(serviceId)) {
       return res.status(400).json({ message: "معرف الخدمة غير صحيح" });
     }
 
@@ -898,7 +903,7 @@ exports.getServiceDetails = async (req, res) => {
       return res.status(404).json({ message: "الخدمة غير موجودة" });
     }
 
-    const searchId = id.toString();
+    const searchId = serviceId.toString();
     const serviceExists = content.services.items.some((item) => {
       if (item._id) {
         const itemId = item._id.toString ? item._id.toString() : String(item._id);

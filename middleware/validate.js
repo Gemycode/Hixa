@@ -108,7 +108,6 @@ const validateServices = (req, res, next) => {
     items: Joi.array()
       .items(
         Joi.object({
-          _id: Joi.string().optional(), // Allow _id for existing items
           title_en: Joi.string().max(200).optional(),
           title_ar: Joi.string().max(200).optional(),
           description_en: Joi.string().max(1000).optional(),
@@ -126,57 +125,12 @@ const validateServices = (req, res, next) => {
           details_en: Joi.string().max(5000).optional(),
           details_ar: Joi.string().max(5000).optional(),
           image: Joi.string().uri().allow("").optional(),
-          sectionKey: Joi.string()
-            .valid("section1", "section2", "section3", "section4")
-            .optional()
-            .messages({
-              "any.only": "sectionKey يجب أن يكون section1, section2, section3, أو section4",
-            }),
-          categoryKey: Joi.string()
-            .max(100)
-            .optional()
-            .messages({
-              "string.max": "categoryKey يجب ألا يتجاوز 100 حرف",
-            }),
+          sectionKey: Joi.string().max(100).optional(),
+          categoryKey: Joi.string().max(100).optional(),
         })
       )
       .optional(),
   });
-
-  const { error } = schema.validate(req.body);
-  if (error) return res.status(400).json({ message: error.details[0].message });
-  next();
-};
-
-// Service detail validation (for single detail update)
-const validateServiceDetail = (req, res, next) => {
-  // Check if file is uploaded (counts as a field)
-  const hasFile = !!req.file;
-  
-  // If file is uploaded, skip body validation (file counts as a field)
-  if (hasFile) {
-    return next();
-  }
-  
-  // Otherwise, validate body fields
-  const schema = Joi.object({
-    categoryKey: Joi.string().max(100).optional(),
-    sectionKey: Joi.string()
-      .valid("section1", "section2", "section3", "section4")
-      .optional()
-      .messages({
-        "any.only": "sectionKey يجب أن يكون section1, section2, section3, أو section4",
-      }),
-    title_en: Joi.string().max(200).optional(),
-    title_ar: Joi.string().max(200).optional(),
-    details_en: Joi.string().max(5000).optional(),
-    details_ar: Joi.string().max(5000).optional(),
-    image: Joi.string().uri().allow("").optional(),
-  })
-    .min(1)
-    .messages({
-      "object.min": "يجب إرسال حقل واحد على الأقل للتحديث",
-    });
 
   const { error } = schema.validate(req.body);
   if (error) return res.status(400).json({ message: error.details[0].message });
@@ -274,23 +228,6 @@ const validatePartners = (req, res, next) => {
     title_ar: Joi.string().max(200).optional(),
     subtitle_en: Joi.string().max(1000).optional(),
     subtitle_ar: Joi.string().max(1000).optional(),
-  });
-
-  const { error } = schema.validate(req.body);
-  if (error) return res.status(400).json({ message: error.details[0].message });
-  next();
-};
-
-// Service item validation
-const validateServiceItem = (req, res, next) => {
-  const schema = Joi.object({
-    title_en: Joi.string().max(200).optional(),
-    title_ar: Joi.string().max(200).optional(),
-    description_en: Joi.string().max(1000).optional(),
-    description_ar: Joi.string().max(1000).optional(),
-    icon: Joi.string().allow("").optional(),
-  }).min(1).messages({
-    "object.min": "يجب إرسال حقل واحد على الأقل",
   });
 
   const { error } = schema.validate(req.body);
@@ -714,8 +651,6 @@ module.exports = {
   validateHero,
   validateAbout,
   validateServices,
-  validateServiceItem,
-  validateServiceDetail,
   validateProjects,
   validateProjectItem,
   validateJobs,

@@ -6,22 +6,10 @@ const {
   updateHero,
   updateAbout,
   updateServices,
-  addServiceItem,
-  updateServiceItem,
-  deleteServiceItem,
-  updateServiceDetail,
   updateProjects,
   addProjectItem,
   updateProjectItem,
   deleteProjectItem,
-  updatePartners,
-  addPartnerItem,
-  updatePartnerItem,
-  deletePartnerItem,
-  updateJobs,
-  addJobItem,
-  updateJobItem,
-  deleteJobItem,
   updateFeatures,
   updateCTA,
   updateFooter,
@@ -32,14 +20,8 @@ const {
   validateHero,
   validateAbout,
   validateServices,
-  validateServiceItem,
-  validateServiceDetail,
   validateProjects,
   validateProjectItem,
-  validatePartners,
-  validatePartnerItem,
-  validateJobs,
-  validateJobItem,
   validateFeatures,
   validateCTA,
   validateFooter,
@@ -53,12 +35,6 @@ router.get("/", getContent);
 router.put("/hero", protect, adminOnly, validateHero, updateHero);
 router.put("/about", protect, adminOnly, validateAbout, updateAbout);
 router.put("/services", protect, adminOnly, validateServices, updateServices);
-// Service items CRUD operations
-router.post("/services/items", protect, adminOnly, validateServiceItem, addServiceItem);
-router.put("/services/items/:id", protect, adminOnly, validateServiceItem, updateServiceItem);
-router.delete("/services/items/:id", protect, adminOnly, deleteServiceItem);
-// Update single service detail (by _id or categoryKey + sectionKey)
-router.put("/services/details/:id", protect, adminOnly, uploadSingle("image"), validateServiceDetail, updateServiceDetail);
 // Projects route - accepts multiple images with field names like image_0, image_1, etc.
 router.put("/projects", protect, adminOnly, (req, res, next) => {
   // Dynamically create fields array based on items count (max 20 items)
@@ -73,16 +49,6 @@ router.put("/projects", protect, adminOnly, (req, res, next) => {
 router.post("/projects/items", protect, adminOnly, uploadSingle("image"), validateProjectItem, addProjectItem);
 router.put("/projects/items/:id", protect, adminOnly, uploadSingle("image"), validateProjectItem, updateProjectItem);
 router.delete("/projects/items/:id", protect, adminOnly, deleteProjectItem);
-
-// Partners section & items
-router.put("/partners", protect, adminOnly, validatePartners, updatePartners);
-router.post("/partners/items", protect, adminOnly, uploadSingle("logo"), validatePartnerItem, addPartnerItem);
-router.put("/partners/items/:id", protect, adminOnly, uploadSingle("logo"), validatePartnerItem, updatePartnerItem);
-router.delete("/partners/items/:id", protect, adminOnly, deletePartnerItem);
-router.put("/jobs", protect, adminOnly, validateJobs, updateJobs);
-router.post("/jobs/items", protect, adminOnly, validateJobItem, addJobItem);
-router.put("/jobs/items/:id", protect, adminOnly, validateJobItem, updateJobItem);
-router.delete("/jobs/items/:id", protect, adminOnly, deleteJobItem);
 router.put("/features", protect, adminOnly, validateFeatures, updateFeatures);
 router.put("/cta", protect, adminOnly, validateCTA, updateCTA);
 router.put("/footer", protect, adminOnly, validateFooter, updateFooter);

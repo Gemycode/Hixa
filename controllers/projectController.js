@@ -72,7 +72,7 @@ exports.getProjects = async (req, res, next) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
     const skip = (page - 1) * limit;
 
-    const { status, projectType, category, search, city, country } = req.query;
+    const { status, projectType, search, city, country } = req.query;
 
     // Build filters based on user role
     const filters = {};
@@ -98,10 +98,6 @@ exports.getProjects = async (req, res, next) => {
       filters.projectType = projectType;
     }
 
-    if (category) {
-      filters.category = category;
-    }
-
     if (city || country) {
       const locationRegex = new RegExp(city || country, "i");
       filters.location = locationRegex;
@@ -119,72 +115,6 @@ exports.getProjects = async (req, res, next) => {
 
     // Only show active projects
     filters.isActive = true;
-
-    const [projects, total] = await Promise.all([
-      Project.find(filters)
-        .populate("client", "name email")
-        .populate("assignedEngineer", "name email")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
-      Project.countDocuments(filters),
-    ]);
-
-    res.json({
-      data: projects.map(sanitizeProject),
-      meta: {
-        total,
-        page,
-        limit,
-        pages: Math.ceil(total / limit) || 1,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// GET projects by category
-exports.getProjectsByCategory = async (req, res, next) => {
-  try {
-    const { category } = req.params;
-    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
-    const skip = (page - 1) * limit;
-
-    const { status, projectType, search } = req.query;
-
-    // Build filters
-    const filters = { category, isActive: true };
-
-    // Role-based filtering
-    if (req.user.role === "client") {
-      filters.client = req.user._id;
-    } else if (req.user.role === "engineer") {
-      filters.$or = [
-        { assignedEngineer: req.user._id },
-        { status: "Waiting for Engineers" },
-        { status: "Pending Review" },
-      ];
-    }
-
-    if (status) {
-      filters.status = status;
-    }
-
-    if (projectType) {
-      filters.projectType = projectType;
-    }
-
-    if (search) {
-      const regex = new RegExp(search, "i");
-      filters.$or = [
-        ...(filters.$or || []),
-        { title: regex },
-        { description: regex },
-        { tags: { $in: [regex] } },
-      ];
-    }
 
     const [projects, total] = await Promise.all([
       Project.find(filters)

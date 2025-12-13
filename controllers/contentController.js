@@ -165,10 +165,38 @@ exports.updateServices = async (req, res) => {
     if (subtitle_ar !== undefined) updateFields["services.subtitle_ar"] = subtitle_ar;
     
     const parsedItems = parseArray(items);
-    if (parsedItems !== undefined) updateFields["services.items"] = parsedItems;
+    if (parsedItems !== undefined) {
+      // Ensure all items have _id - preserve existing IDs or create new ones
+      const itemsWithIds = parsedItems.map((item) => {
+        if (!item._id) {
+          // If no _id provided, create a new one
+          item._id = new mongoose.Types.ObjectId();
+        } else if (typeof item._id === 'string') {
+          // Convert string _id to ObjectId if needed
+          item._id = new mongoose.Types.ObjectId(item._id);
+        }
+        return item;
+      });
+      updateFields["services.items"] = itemsWithIds;
+    }
     
     const parsedDetails = parseArray(details);
-    if (parsedDetails !== undefined) updateFields["services.details"] = parsedDetails;
+    if (parsedDetails !== undefined) {
+      // Ensure all details have _id - preserve existing IDs or create new ones
+      const detailsWithIds = parsedDetails.map((detail) => {
+        if (!detail._id) {
+          detail._id = new mongoose.Types.ObjectId();
+        } else if (typeof detail._id === 'string') {
+          detail._id = new mongoose.Types.ObjectId(detail._id);
+        }
+        // Handle serviceItemId conversion
+        if (detail.serviceItemId && typeof detail.serviceItemId === 'string') {
+          detail.serviceItemId = new mongoose.Types.ObjectId(detail.serviceItemId);
+        }
+        return detail;
+      });
+      updateFields["services.details"] = detailsWithIds;
+    }
 
     // Only update if there are fields to update
     if (Object.keys(updateFields).length === 0) {
@@ -232,16 +260,46 @@ exports.updateServiceItem = async (req, res) => {
     const { title_en, title_ar, description_en, description_ar, icon } = req.body;
 
     const content = await Content.findOne();
-    if (!content || !content.services || !content.services.items) {
-      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    if (!content) {
+      return res.status(404).json({ message: "المحتوى غير موجود" });
     }
 
-    const itemIndex = content.services.items.findIndex(
-      (item) => item._id && item._id.toString() === id
-    );
+    if (!content.services) {
+      return res.status(404).json({ message: "قسم الخدمات غير موجود" });
+    }
+
+    if (!content.services.items || !Array.isArray(content.services.items) || content.services.items.length === 0) {
+      return res.status(404).json({ message: "لا توجد خدمات في القائمة" });
+    }
+
+    // Try to find item by ID - handle both ObjectId and string formats
+    let itemIndex = -1;
+    const searchId = id.toString();
+
+    for (let i = 0; i < content.services.items.length; i++) {
+      const item = content.services.items[i];
+      if (item._id) {
+        // Handle both ObjectId and string
+        const itemId = item._id.toString ? item._id.toString() : String(item._id);
+        if (itemId === searchId) {
+          itemIndex = i;
+          break;
+        }
+      }
+    }
 
     if (itemIndex === -1) {
-      return res.status(404).json({ message: "الخدمة غير موجودة" });
+      return res.status(404).json({ 
+        message: "الخدمة غير موجودة",
+        debug: {
+          requestedId: id,
+          availableIds: content.services.items.map((item, idx) => ({
+            index: idx,
+            id: item._id ? (item._id.toString ? item._id.toString() : String(item._id)) : "no-id",
+            title: item.title_en || item.title_ar || "no-title"
+          }))
+        }
+      });
     }
 
     const updateFields = {};
@@ -276,15 +334,48 @@ exports.deleteServiceItem = async (req, res) => {
     }
 
     const content = await Content.findOne();
-    if (!content || !content.services || !content.services.items) {
-      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    if (!content) {
+      return res.status(404).json({ message: "المحتوى غير موجود" });
     }
 
-    const item = content.services.items.find(
-      (item) => item._id && item._id.toString() === id
-    );
+    if (!content.services) {
+      return res.status(404).json({ message: "قسم الخدمات غير موجود" });
+    }
+
+    if (!content.services.items || !Array.isArray(content.services.items) || content.services.items.length === 0) {
+      return res.status(404).json({ message: "لا توجد خدمات في القائمة" });
+    }
+
+    // Try to find item by ID - handle both ObjectId and string formats
+    const searchId = id.toString();
+    let item = null;
+    let itemIndex = -1;
+
+    for (let i = 0; i < content.services.items.length; i++) {
+      const currentItem = content.services.items[i];
+      if (currentItem._id) {
+        // Handle both ObjectId and string
+        const itemId = currentItem._id.toString ? currentItem._id.toString() : String(currentItem._id);
+        if (itemId === searchId) {
+          item = currentItem;
+          itemIndex = i;
+          break;
+        }
+      }
+    }
+
     if (!item) {
-      return res.status(404).json({ message: "الخدمة غير موجودة" });
+      return res.status(404).json({ 
+        message: "الخدمة غير موجودة",
+        debug: {
+          requestedId: id,
+          availableIds: content.services.items.map((item, idx) => ({
+            index: idx,
+            id: item._id ? (item._id.toString ? item._id.toString() : String(item._id)) : "no-id",
+            title: item.title_en || item.title_ar || "no-title"
+          }))
+        }
+      });
     }
 
     // Find and delete all related details (if serviceItemId exists) or by sectionKey/categoryKey

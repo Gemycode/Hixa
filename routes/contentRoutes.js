@@ -48,8 +48,7 @@ router.get("/", getContent);
 // Protected admin routes - update content sections
 router.put("/hero", protect, adminOnly, validateHero, updateHero);
 router.put("/about", protect, adminOnly, validateAbout, updateAbout);
-router.put("/services", protect, adminOnly, validateServicesHeaders, updateServicesHeaders); // Safe update - only headers, doesn't affect items or details
-router.put("/services/full", protect, adminOnly, validateServices, updateServices); // Full update - can update items and details
+router.put("/services", protect, adminOnly, validateServices, updateServices); // Update services - only updates fields provided, preserves items/details if not sent
 
 // Services items CRUD operations
 // IMPORTANT: More specific routes (with /details) must come before less specific ones

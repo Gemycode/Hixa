@@ -433,6 +433,11 @@ exports.addServiceDetail = async (req, res) => {
     const { title_en, title_ar, details_en, details_ar, image, sectionKey, categoryKey } = req.body;
     let imageUrl = image;
 
+    // Validate that serviceId is provided and not empty
+    if (!serviceId || serviceId.trim() === "") {
+      return res.status(400).json({ message: "معرف الخدمة مطلوب" });
+    }
+
     // Validate serviceId from URL
     if (!mongoose.Types.ObjectId.isValid(serviceId)) {
       return res.status(400).json({ message: "معرف الخدمة غير صحيح" });
@@ -494,6 +499,16 @@ exports.addServiceDetail = async (req, res) => {
 exports.updateServiceDetail = async (req, res) => {
   try {
     const { serviceId, id } = req.params; // Get both serviceId and detail id from URL
+
+    // Validate that serviceId is provided and not empty
+    if (!serviceId || serviceId.trim() === "") {
+      return res.status(400).json({ message: "معرف الخدمة مطلوب" });
+    }
+
+    // Validate that detail id is provided and not empty
+    if (!id || id.trim() === "") {
+      return res.status(400).json({ message: "معرف تفاصيل الخدمة مطلوب" });
+    }
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "معرف تفاصيل الخدمة غير صحيح" });
@@ -632,6 +647,16 @@ exports.updateServiceDetail = async (req, res) => {
 exports.deleteServiceDetail = async (req, res) => {
   try {
     const { serviceId, id } = req.params; // Get both serviceId and detail id from URL
+
+    // Validate that serviceId is provided and not empty
+    if (!serviceId || serviceId.trim() === "") {
+      return res.status(400).json({ message: "معرف الخدمة مطلوب" });
+    }
+
+    // Validate that detail id is provided and not empty
+    if (!id || id.trim() === "") {
+      return res.status(400).json({ message: "معرف تفاصيل الخدمة مطلوب" });
+    }
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "معرف تفاصيل الخدمة غير صحيح" });
@@ -904,6 +929,66 @@ exports.getServiceDetails = async (req, res) => {
       message: "تم جلب تفاصيل الخدمة بنجاح",
       data: details,
       count: details.length,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// GET single service detail by ID
+exports.getServiceDetailById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "معرف تفاصيل الخدمة غير صحيح" });
+    }
+
+    const content = await Content.findOne();
+    if (!content || !content.services) {
+      return res.status(404).json({ message: "قسم الخدمات غير موجود" });
+    }
+
+    if (!content.services.details || !Array.isArray(content.services.details)) {
+      return res.status(404).json({ message: "تفاصيل الخدمة غير موجودة" });
+    }
+
+    const searchId = id.toString();
+    let detail = null;
+
+    for (const currentDetail of content.services.details) {
+      if (currentDetail._id) {
+        const detailId = currentDetail._id.toString ? currentDetail._id.toString() : String(currentDetail._id);
+        if (detailId === searchId) {
+          detail = currentDetail;
+          break;
+        }
+      }
+    }
+
+    if (!detail) {
+      return res.status(404).json({ message: "تفاصيل الخدمة غير موجودة" });
+    }
+
+    // If detail has serviceItemId, get the service info too
+    let service = null;
+    if (detail.serviceItemId && content.services.items) {
+      const serviceId = detail.serviceItemId.toString ? detail.serviceItemId.toString() : String(detail.serviceItemId);
+      service = content.services.items.find((item) => {
+        if (item._id) {
+          const itemId = item._id.toString ? item._id.toString() : String(item._id);
+          return itemId === serviceId;
+        }
+        return false;
+      });
+    }
+
+    res.json({
+      message: "تم جلب تفاصيل الخدمة بنجاح",
+      data: {
+        detail: detail,
+        service: service || null,
+      },
     });
   } catch (err) {
     res.status(500).json({ message: "خطأ في الخادم", error: err.message });

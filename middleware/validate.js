@@ -137,6 +137,38 @@ const validateServices = (req, res, next) => {
   next();
 };
 
+// Service item validation
+const validateServiceItem = (req, res, next) => {
+  const schema = Joi.object({
+    title_en: Joi.string().max(200).optional(),
+    title_ar: Joi.string().max(200).optional(),
+    description_en: Joi.string().max(1000).optional(),
+    description_ar: Joi.string().max(1000).optional(),
+    icon: Joi.string().allow("").optional(),
+  });
+
+  const { error } = schema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
+  next();
+};
+
+// Service detail validation
+const validateServiceDetail = (req, res, next) => {
+  const schema = Joi.object({
+    title_en: Joi.string().max(200).optional(),
+    title_ar: Joi.string().max(200).optional(),
+    details_en: Joi.string().max(5000).optional(),
+    details_ar: Joi.string().max(5000).optional(),
+    image: Joi.string().uri().allow("").optional(),
+    sectionKey: Joi.string().max(100).optional(),
+    categoryKey: Joi.string().max(100).optional(),
+  });
+
+  const { error } = schema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
+  next();
+};
+
 // Projects validation
 const validateProjects = (req, res, next) => {
   const schema = Joi.object({
@@ -651,6 +683,8 @@ module.exports = {
   validateHero,
   validateAbout,
   validateServices,
+  validateServiceItem,
+  validateServiceDetail,
   validateProjects,
   validateProjectItem,
   validateJobs,

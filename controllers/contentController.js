@@ -190,6 +190,258 @@ exports.updateServices = async (req, res) => {
   }
 };
 
+// ADD new service item
+exports.addServiceItem = async (req, res) => {
+  try {
+    const { title_en, title_ar, description_en, description_ar, icon } = req.body;
+
+    const newItem = {
+      _id: new mongoose.Types.ObjectId(),
+      title_en: title_en || "",
+      title_ar: title_ar || "",
+      description_en: description_en || "",
+      description_ar: description_ar || "",
+      icon: icon || "",
+    };
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $push: { "services.items": newItem } },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    const addedItem = updated.services.items[updated.services.items.length - 1];
+    res.json({
+      message: "تم إضافة الخدمة بنجاح",
+      data: addedItem,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// UPDATE service item by ID
+exports.updateServiceItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "معرف الخدمة غير صحيح" });
+    }
+
+    const { title_en, title_ar, description_en, description_ar, icon } = req.body;
+
+    const content = await Content.findOne();
+    if (!content || !content.services || !content.services.items) {
+      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    }
+
+    const itemIndex = content.services.items.findIndex(
+      (item) => item._id && item._id.toString() === id
+    );
+
+    if (itemIndex === -1) {
+      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    }
+
+    const updateFields = {};
+    if (title_en !== undefined) updateFields[`services.items.${itemIndex}.title_en`] = title_en;
+    if (title_ar !== undefined) updateFields[`services.items.${itemIndex}.title_ar`] = title_ar;
+    if (description_en !== undefined) updateFields[`services.items.${itemIndex}.description_en`] = description_en;
+    if (description_ar !== undefined) updateFields[`services.items.${itemIndex}.description_ar`] = description_ar;
+    if (icon !== undefined) updateFields[`services.items.${itemIndex}.icon`] = icon;
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $set: updateFields },
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      message: "تم تحديث الخدمة بنجاح",
+      data: updated.services.items[itemIndex],
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// DELETE service item by ID
+exports.deleteServiceItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "معرف الخدمة غير صحيح" });
+    }
+
+    const content = await Content.findOne();
+    if (!content || !content.services || !content.services.items) {
+      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    }
+
+    const item = content.services.items.find(
+      (item) => item._id && item._id.toString() === id
+    );
+    if (!item) {
+      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    }
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $pull: { "services.items": { _id: new mongoose.Types.ObjectId(id) } } },
+      { new: true }
+    );
+
+    res.json({
+      message: "تم حذف الخدمة بنجاح",
+      data: updated.services.items,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// ADD new service detail
+exports.addServiceDetail = async (req, res) => {
+  try {
+    const { title_en, title_ar, details_en, details_ar, image, sectionKey, categoryKey } = req.body;
+    let imageUrl = image;
+
+    // Handle file upload if image file is provided
+    if (req.file) {
+      imageUrl = await uploadToCloudinary(req.file.buffer, "hixa/services");
+    }
+
+    const newDetail = {
+      _id: new mongoose.Types.ObjectId(),
+      title_en: title_en || "",
+      title_ar: title_ar || "",
+      details_en: details_en || "",
+      details_ar: details_ar || "",
+      image: imageUrl || "",
+      sectionKey: sectionKey || "",
+      categoryKey: categoryKey || "",
+    };
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $push: { "services.details": newDetail } },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    const addedDetail = updated.services.details[updated.services.details.length - 1];
+    res.json({
+      message: "تم إضافة تفاصيل الخدمة بنجاح",
+      data: addedDetail,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// UPDATE service detail by ID
+exports.updateServiceDetail = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "معرف تفاصيل الخدمة غير صحيح" });
+    }
+
+    const { title_en, title_ar, details_en, details_ar, image, sectionKey, categoryKey } = req.body;
+
+    const content = await Content.findOne();
+    if (!content || !content.services || !content.services.details) {
+      return res.status(404).json({ message: "تفاصيل الخدمة غير موجودة" });
+    }
+
+    const detailIndex = content.services.details.findIndex(
+      (detail) => detail._id && detail._id.toString() === id
+    );
+
+    if (detailIndex === -1) {
+      return res.status(404).json({ message: "تفاصيل الخدمة غير موجودة" });
+    }
+
+    const currentDetail = content.services.details[detailIndex];
+    let imageUrl = image || currentDetail.image;
+
+    // Handle file upload if image file is provided
+    if (req.file) {
+      imageUrl = await uploadToCloudinary(req.file.buffer, "hixa/services");
+      
+      // Delete old image if exists
+      if (currentDetail.image && currentDetail.image.includes("cloudinary.com")) {
+        await deleteFromCloudinary(currentDetail.image);
+      }
+    }
+
+    const updateFields = {};
+    if (title_en !== undefined) updateFields[`services.details.${detailIndex}.title_en`] = title_en;
+    if (title_ar !== undefined) updateFields[`services.details.${detailIndex}.title_ar`] = title_ar;
+    if (details_en !== undefined) updateFields[`services.details.${detailIndex}.details_en`] = details_en;
+    if (details_ar !== undefined) updateFields[`services.details.${detailIndex}.details_ar`] = details_ar;
+    if (imageUrl !== undefined) updateFields[`services.details.${detailIndex}.image`] = imageUrl;
+    if (sectionKey !== undefined) updateFields[`services.details.${detailIndex}.sectionKey`] = sectionKey;
+    if (categoryKey !== undefined) updateFields[`services.details.${detailIndex}.categoryKey`] = categoryKey;
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $set: updateFields },
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      message: "تم تحديث تفاصيل الخدمة بنجاح",
+      data: updated.services.details[detailIndex],
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// DELETE service detail by ID
+exports.deleteServiceDetail = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "معرف تفاصيل الخدمة غير صحيح" });
+    }
+
+    const content = await Content.findOne();
+    if (!content || !content.services || !content.services.details) {
+      return res.status(404).json({ message: "تفاصيل الخدمة غير موجودة" });
+    }
+
+    const detail = content.services.details.find(
+      (detail) => detail._id && detail._id.toString() === id
+    );
+    if (!detail) {
+      return res.status(404).json({ message: "تفاصيل الخدمة غير موجودة" });
+    }
+
+    // Delete image from Cloudinary if exists
+    if (detail.image && detail.image.includes("cloudinary.com")) {
+      await deleteFromCloudinary(detail.image);
+    }
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $pull: { "services.details": { _id: new mongoose.Types.ObjectId(id) } } },
+      { new: true }
+    );
+
+    res.json({
+      message: "تم حذف تفاصيل الخدمة بنجاح",
+      data: updated.services.details,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
 // ADD new project item
 exports.addProjectItem = async (req, res) => {
   try {

@@ -6,6 +6,12 @@ const {
   updateHero,
   updateAbout,
   updateServices,
+  addServiceItem,
+  updateServiceItem,
+  deleteServiceItem,
+  addServiceDetail,
+  updateServiceDetail,
+  deleteServiceDetail,
   updateProjects,
   addProjectItem,
   updateProjectItem,
@@ -20,6 +26,8 @@ const {
   validateHero,
   validateAbout,
   validateServices,
+  validateServiceItem,
+  validateServiceDetail,
   validateProjects,
   validateProjectItem,
   validateFeatures,
@@ -35,6 +43,17 @@ router.get("/", getContent);
 router.put("/hero", protect, adminOnly, validateHero, updateHero);
 router.put("/about", protect, adminOnly, validateAbout, updateAbout);
 router.put("/services", protect, adminOnly, validateServices, updateServices);
+
+// Services items CRUD operations
+router.post("/services/items", protect, adminOnly, validateServiceItem, addServiceItem);
+router.put("/services/items/:id", protect, adminOnly, validateServiceItem, updateServiceItem);
+router.delete("/services/items/:id", protect, adminOnly, deleteServiceItem);
+
+// Services details CRUD operations
+router.post("/services/details", protect, adminOnly, uploadSingle("image"), validateServiceDetail, addServiceDetail);
+router.put("/services/details/:id", protect, adminOnly, uploadSingle("image"), validateServiceDetail, updateServiceDetail);
+router.delete("/services/details/:id", protect, adminOnly, deleteServiceDetail);
+
 // Projects route - accepts multiple images with field names like image_0, image_1, etc.
 router.put("/projects", protect, adminOnly, (req, res, next) => {
   // Dynamically create fields array based on items count (max 20 items)

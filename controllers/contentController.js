@@ -541,7 +541,7 @@ exports.updateServiceDetail = async (req, res) => {
       if (detail._id) {
         const detailId = detail._id.toString ? detail._id.toString() : String(detail._id);
         if (detailId === searchDetailId) {
-          // Also verify this detail belongs to the service
+          // Also verify this detail belongs to the service (if serviceItemId exists)
           if (detail.serviceItemId) {
             const detailServiceId = detail.serviceItemId.toString 
               ? detail.serviceItemId.toString() 
@@ -561,7 +561,7 @@ exports.updateServiceDetail = async (req, res) => {
     }
 
     const currentDetail = content.services.details[detailIndex];
-    let imageUrl = image || currentDetail.image;
+    let imageUrl = currentDetail.image; // Keep current image by default
 
     // Handle file upload if image file is provided
     if (req.file) {
@@ -569,19 +569,36 @@ exports.updateServiceDetail = async (req, res) => {
       
       // Delete old image if exists
       if (currentDetail.image && currentDetail.image.includes("cloudinary.com")) {
-        await deleteFromCloudinary(currentDetail.image);
+        try {
+          await deleteFromCloudinary(currentDetail.image);
+        } catch (err) {
+          console.error("Error deleting image from Cloudinary:", err);
+        }
       }
+    } else if (image !== undefined) {
+      // If image URL is provided in body (not file upload)
+      imageUrl = image;
     }
 
+    // Build update fields - only include fields that are provided
     const updateFields = {};
     if (title_en !== undefined) updateFields[`services.details.${detailIndex}.title_en`] = title_en;
     if (title_ar !== undefined) updateFields[`services.details.${detailIndex}.title_ar`] = title_ar;
     if (details_en !== undefined) updateFields[`services.details.${detailIndex}.details_en`] = details_en;
     if (details_ar !== undefined) updateFields[`services.details.${detailIndex}.details_ar`] = details_ar;
-    if (imageUrl !== undefined) updateFields[`services.details.${detailIndex}.image`] = imageUrl;
+    if (imageUrl !== undefined && imageUrl !== null) updateFields[`services.details.${detailIndex}.image`] = imageUrl;
     if (sectionKey !== undefined) updateFields[`services.details.${detailIndex}.sectionKey`] = sectionKey;
     if (categoryKey !== undefined) updateFields[`services.details.${detailIndex}.categoryKey`] = categoryKey;
-    // serviceItemId is always set from URL, no need to update it
+    
+    // Update serviceItemId if it's null/undefined (for old details)
+    if (!currentDetail.serviceItemId) {
+      updateFields[`services.details.${detailIndex}.serviceItemId`] = new mongoose.Types.ObjectId(serviceId);
+    }
+
+    // Check if there are any fields to update
+    if (Object.keys(updateFields).length === 0) {
+      return res.status(400).json({ message: "لم يتم إرسال أي بيانات للتحديث" });
+    }
 
     const updated = await Content.findOneAndUpdate(
       {},
@@ -589,9 +606,22 @@ exports.updateServiceDetail = async (req, res) => {
       { new: true, runValidators: true }
     );
 
+    // Find the updated detail again (in case index changed, though it shouldn't)
+    const updatedDetail = updated.services.details.find((detail) => {
+      if (detail._id) {
+        const detailId = detail._id.toString ? detail._id.toString() : String(detail._id);
+        return detailId === searchDetailId;
+      }
+      return false;
+    });
+
+    if (!updatedDetail) {
+      return res.status(500).json({ message: "حدث خطأ أثناء التحديث" });
+    }
+
     res.json({
       message: "تم تحديث تفاصيل الخدمة بنجاح",
-      data: updated.services.details[detailIndex],
+      data: updatedDetail,
     });
   } catch (err) {
     res.status(500).json({ message: "خطأ في الخادم", error: err.message });

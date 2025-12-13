@@ -14,6 +14,7 @@ const {
   addServiceDetail,
   updateServiceDetail,
   deleteServiceDetail,
+  deleteOrphanedServiceDetails,
   updateProjects,
   addProjectItem,
   updateProjectItem,
@@ -57,6 +58,7 @@ router.get("/services/items/:id/details", getServiceDetails); // Public - get se
 router.post("/services/items/:serviceId/details", protect, adminOnly, uploadSingle("image"), validateServiceDetail, addServiceDetail);
 router.put("/services/items/:serviceId/details/:id", protect, adminOnly, uploadSingle("image"), validateServiceDetail, updateServiceDetail);
 router.delete("/services/items/:serviceId/details/:id", protect, adminOnly, deleteServiceDetail);
+router.delete("/services/details/orphaned", protect, adminOnly, deleteOrphanedServiceDetails); // Delete details with null serviceItemId
 
 // Projects route - accepts multiple images with field names like image_0, image_1, etc.
 router.put("/projects", protect, adminOnly, (req, res, next) => {

@@ -685,6 +685,83 @@ exports.deleteServiceDetail = async (req, res) => {
   }
 };
 
+// DELETE all service details with null serviceItemId (orphaned details)
+exports.deleteOrphanedServiceDetails = async (req, res) => {
+  try {
+    const content = await Content.findOne();
+    if (!content || !content.services) {
+      return res.status(404).json({ message: "المحتوى غير موجود" });
+    }
+
+    if (!content.services.details || !Array.isArray(content.services.details)) {
+      return res.status(200).json({ 
+        message: "لا توجد تفاصيل للخدمات",
+        deletedCount: 0 
+      });
+    }
+
+    // Find orphaned details (those without serviceItemId or with null serviceItemId)
+    const orphanedDetails = content.services.details.filter((detail) => {
+      return !detail.serviceItemId || detail.serviceItemId === null || detail.serviceItemId === undefined;
+    });
+
+    if (orphanedDetails.length === 0) {
+      return res.status(200).json({ 
+        message: "لا توجد تفاصيل غير مرتبطة بخدمات",
+        deletedCount: 0 
+      });
+    }
+
+    // Delete images from Cloudinary for orphaned details
+    for (const detail of orphanedDetails) {
+      if (detail.image && detail.image.includes("cloudinary.com")) {
+        try {
+          await deleteFromCloudinary(detail.image);
+        } catch (err) {
+          console.error("Error deleting image from Cloudinary:", err);
+        }
+      }
+    }
+
+    // Remove orphaned details using $pull with $or condition
+    const orphanedIds = orphanedDetails
+      .map((detail) => detail._id)
+      .filter((id) => id);
+
+    if (orphanedIds.length === 0) {
+      return res.status(200).json({ 
+        message: "لا توجد تفاصيل للحذف",
+        deletedCount: 0 
+      });
+    }
+
+    // Use $pull to remove all orphaned details
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { 
+        $pull: { 
+          "services.details": { 
+            $or: [
+              { serviceItemId: null },
+              { serviceItemId: { $exists: false } },
+              { _id: { $in: orphanedIds } }
+            ]
+          } 
+        } 
+      },
+      { new: true }
+    );
+
+    res.json({
+      message: `تم حذف ${orphanedDetails.length} من التفاصيل غير المرتبطة بخدمات بنجاح`,
+      deletedCount: orphanedDetails.length,
+      remainingDetails: updated.services.details.length,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
 // GET service item by ID with its details
 exports.getServiceItem = async (req, res) => {
   try {

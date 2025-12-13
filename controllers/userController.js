@@ -6,6 +6,7 @@ const sanitizeUser = (user) => ({
   name: user.name,
   role: user.role,
   phone: user.phone,
+  nationalId: user.nationalId,
   location: user.location,
   bio: user.bio,
   specializations: user.specializations || [],
@@ -108,12 +109,14 @@ const updateProfile = async (req, res, next) => {
 // Create new user (admin action)
 const createUser = async (req, res, next) => {
   try {
-    const { email, password, name, role, isActive } = req.body;
+    const { email, password, name, phone, nationalId, role, isActive } = req.body;
 
     const user = await User.create({
       email,
       password,
       name: name || email.split("@")[0],
+      phone: phone || "",
+      nationalId: nationalId || "",
       role: role || "customer",
       ...(typeof isActive !== "undefined" && { isActive }),
     });
@@ -188,7 +191,7 @@ const updateUser = async (req, res, next) => {
     const { id } = req.params;
     const updates = {};
 
-    ["email", "name", "role", "isActive"].forEach((field) => {
+    ["email", "name", "phone", "nationalId", "role", "isActive"].forEach((field) => {
       if (typeof req.body[field] !== "undefined") {
         updates[field] = req.body[field];
       }

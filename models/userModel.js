@@ -8,6 +8,7 @@ const UserSchema = new mongoose.Schema(
     role: { type: String, enum: ["admin", "engineer", "client", "customer"], default: "customer" },
     name: { type: String, trim: true },
     phone: { type: String, trim: true, maxlength: 50 },
+    nationalId: { type: String, trim: true, maxlength: 20, unique: true, sparse: true }, // الرقم القومي
     location: { type: String, trim: true, maxlength: 200 },
     bio: { type: String, trim: true, maxlength: 1000 },
   specializations: [

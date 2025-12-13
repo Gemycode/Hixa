@@ -138,6 +138,22 @@ const validateServices = (req, res, next) => {
   next();
 };
 
+// Services headers validation (only titles, no items or details)
+const validateServicesHeaders = (req, res, next) => {
+  const schema = Joi.object({
+    title_en: Joi.string().max(200).optional(),
+    title_ar: Joi.string().max(200).optional(),
+    subtitle_en: Joi.string().max(1000).optional(),
+    subtitle_ar: Joi.string().max(1000).optional(),
+  }).min(1).messages({
+    "object.min": "يجب إرسال حقل واحد على الأقل للتحديث",
+  });
+
+  const { error } = schema.validate(req.body);
+  if (error) return res.status(400).json({ message: error.details[0].message });
+  next();
+};
+
 // Service item validation
 const validateServiceItem = (req, res, next) => {
   const schema = Joi.object({
@@ -469,6 +485,11 @@ const validateUserCreate = (req, res, next) => {
       "any.required": "كلمة المرور مطلوبة",
     }),
     name: Joi.string().trim().max(100).optional(),
+    phone: Joi.string().trim().max(50).optional(),
+    nationalId: Joi.string().trim().max(20).required().messages({
+      "any.required": "الرقم القومي مطلوب",
+      "string.max": "الرقم القومي يجب ألا يتجاوز 20 حرف",
+    }),
     role: Joi.string().valid(...roles).optional(),
     isActive: Joi.boolean().optional(),
   });
@@ -487,6 +508,7 @@ const validateUserUpdate = (req, res, next) => {
     password: Joi.string().pattern(passwordRegex),
     name: Joi.string().trim().max(100),
     phone: Joi.string().trim().max(50),
+    nationalId: Joi.string().trim().max(20).optional(),
     location: Joi.string().trim().max(200),
     bio: Joi.string().trim().max(1000),
     role: Joi.string().valid(...roles),
@@ -685,6 +707,7 @@ module.exports = {
   validateHero,
   validateAbout,
   validateServices,
+  validateServicesHeaders,
   validateServiceItem,
   validateServiceDetail,
   validateProjects,

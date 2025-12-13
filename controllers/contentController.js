@@ -282,6 +282,43 @@ exports.updateServices = async (req, res) => {
   }
 };
 
+// UPDATE services section headers only (safe update - doesn't affect items or details)
+exports.updateServicesHeaders = async (req, res) => {
+  try {
+    const { title_en, title_ar, subtitle_en, subtitle_ar } = req.body;
+
+    // Only include fields that are actually provided (not undefined)
+    const updateFields = {};
+    if (title_en !== undefined) updateFields["services.title_en"] = title_en;
+    if (title_ar !== undefined) updateFields["services.title_ar"] = title_ar;
+    if (subtitle_en !== undefined) updateFields["services.subtitle_en"] = subtitle_en;
+    if (subtitle_ar !== undefined) updateFields["services.subtitle_ar"] = subtitle_ar;
+
+    // Only update if there are fields to update
+    if (Object.keys(updateFields).length === 0) {
+      return res.status(400).json({ message: "لم يتم إرسال أي بيانات للتحديث" });
+    }
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $set: updateFields },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    res.json({
+      message: "تم تحديث عناوين الخدمات بنجاح",
+      data: {
+        title_en: updated.services.title_en,
+        title_ar: updated.services.title_ar,
+        subtitle_en: updated.services.subtitle_en,
+        subtitle_ar: updated.services.subtitle_ar,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
 // ADD new service item
 exports.addServiceItem = async (req, res) => {
   try {

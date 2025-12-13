@@ -429,26 +429,32 @@ exports.deleteServiceItem = async (req, res) => {
 // ADD new service detail
 exports.addServiceDetail = async (req, res) => {
   try {
-    const { title_en, title_ar, details_en, details_ar, image, sectionKey, categoryKey, serviceItemId } = req.body;
+    const { serviceId } = req.params; // Get serviceId from URL
+    const { title_en, title_ar, details_en, details_ar, image, sectionKey, categoryKey } = req.body;
     let imageUrl = image;
 
-    // Validate serviceItemId if provided
-    if (serviceItemId && !mongoose.Types.ObjectId.isValid(serviceItemId)) {
-      return res.status(400).json({ message: "معرف الخدمة المرتبطة غير صحيح" });
+    // Validate serviceId from URL
+    if (!mongoose.Types.ObjectId.isValid(serviceId)) {
+      return res.status(400).json({ message: "معرف الخدمة غير صحيح" });
     }
 
-    // Verify service item exists if serviceItemId is provided
-    if (serviceItemId) {
-      const content = await Content.findOne();
-      if (!content || !content.services || !content.services.items) {
-        return res.status(404).json({ message: "الخدمة المرتبطة غير موجودة" });
+    // Verify service item exists
+    const content = await Content.findOne();
+    if (!content || !content.services || !content.services.items) {
+      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    }
+
+    const searchServiceId = serviceId.toString();
+    const serviceItem = content.services.items.find((item) => {
+      if (item._id) {
+        const itemId = item._id.toString ? item._id.toString() : String(item._id);
+        return itemId === searchServiceId;
       }
-      const serviceItem = content.services.items.find(
-        (item) => item._id && item._id.toString() === serviceItemId
-      );
-      if (!serviceItem) {
-        return res.status(404).json({ message: "الخدمة المرتبطة غير موجودة" });
-      }
+      return false;
+    });
+
+    if (!serviceItem) {
+      return res.status(404).json({ message: "الخدمة غير موجودة" });
     }
 
     // Handle file upload if image file is provided
@@ -465,7 +471,7 @@ exports.addServiceDetail = async (req, res) => {
       image: imageUrl || "",
       sectionKey: sectionKey || "",
       categoryKey: categoryKey || "",
-      serviceItemId: serviceItemId ? new mongoose.Types.ObjectId(serviceItemId) : undefined,
+      serviceItemId: new mongoose.Types.ObjectId(serviceId), // Use serviceId from URL
     };
 
     const updated = await Content.findOneAndUpdate(
@@ -487,45 +493,71 @@ exports.addServiceDetail = async (req, res) => {
 // UPDATE service detail by ID
 exports.updateServiceDetail = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { serviceId, id } = req.params; // Get both serviceId and detail id from URL
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "معرف تفاصيل الخدمة غير صحيح" });
     }
 
-    const { title_en, title_ar, details_en, details_ar, image, sectionKey, categoryKey, serviceItemId } = req.body;
+    if (!mongoose.Types.ObjectId.isValid(serviceId)) {
+      return res.status(400).json({ message: "معرف الخدمة غير صحيح" });
+    }
+
+    const { title_en, title_ar, details_en, details_ar, image, sectionKey, categoryKey } = req.body;
 
     const content = await Content.findOne();
-    if (!content || !content.services || !content.services.details) {
+    if (!content || !content.services) {
+      return res.status(404).json({ message: "المحتوى غير موجود" });
+    }
+
+    // Verify service exists
+    if (!content.services.items || !Array.isArray(content.services.items)) {
+      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    }
+
+    const searchServiceId = serviceId.toString();
+    const serviceExists = content.services.items.some((item) => {
+      if (item._id) {
+        const itemId = item._id.toString ? item._id.toString() : String(item._id);
+        return itemId === searchServiceId;
+      }
+      return false;
+    });
+
+    if (!serviceExists) {
+      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    }
+
+    // Find the detail
+    if (!content.services.details || !Array.isArray(content.services.details)) {
       return res.status(404).json({ message: "تفاصيل الخدمة غير موجودة" });
     }
 
-    const detailIndex = content.services.details.findIndex(
-      (detail) => detail._id && detail._id.toString() === id
-    );
+    const searchDetailId = id.toString();
+    let detailIndex = -1;
+
+    for (let i = 0; i < content.services.details.length; i++) {
+      const detail = content.services.details[i];
+      if (detail._id) {
+        const detailId = detail._id.toString ? detail._id.toString() : String(detail._id);
+        if (detailId === searchDetailId) {
+          // Also verify this detail belongs to the service
+          if (detail.serviceItemId) {
+            const detailServiceId = detail.serviceItemId.toString 
+              ? detail.serviceItemId.toString() 
+              : String(detail.serviceItemId);
+            if (detailServiceId !== searchServiceId) {
+              return res.status(400).json({ message: "هذه التفاصيل لا تنتمي للخدمة المحددة" });
+            }
+          }
+          detailIndex = i;
+          break;
+        }
+      }
+    }
 
     if (detailIndex === -1) {
       return res.status(404).json({ message: "تفاصيل الخدمة غير موجودة" });
-    }
-
-    // Validate serviceItemId if provided
-    if (serviceItemId !== undefined) {
-      if (serviceItemId && !mongoose.Types.ObjectId.isValid(serviceItemId)) {
-        return res.status(400).json({ message: "معرف الخدمة المرتبطة غير صحيح" });
-      }
-      
-      // Verify service item exists if serviceItemId is provided
-      if (serviceItemId) {
-        if (!content.services.items) {
-          return res.status(404).json({ message: "الخدمة المرتبطة غير موجودة" });
-        }
-        const serviceItem = content.services.items.find(
-          (item) => item._id && item._id.toString() === serviceItemId
-        );
-        if (!serviceItem) {
-          return res.status(404).json({ message: "الخدمة المرتبطة غير موجودة" });
-        }
-      }
     }
 
     const currentDetail = content.services.details[detailIndex];
@@ -549,11 +581,7 @@ exports.updateServiceDetail = async (req, res) => {
     if (imageUrl !== undefined) updateFields[`services.details.${detailIndex}.image`] = imageUrl;
     if (sectionKey !== undefined) updateFields[`services.details.${detailIndex}.sectionKey`] = sectionKey;
     if (categoryKey !== undefined) updateFields[`services.details.${detailIndex}.categoryKey`] = categoryKey;
-    if (serviceItemId !== undefined) {
-      updateFields[`services.details.${detailIndex}.serviceItemId`] = serviceItemId 
-        ? new mongoose.Types.ObjectId(serviceItemId) 
-        : null;
-    }
+    // serviceItemId is always set from URL, no need to update it
 
     const updated = await Content.findOneAndUpdate(
       {},
@@ -573,20 +601,66 @@ exports.updateServiceDetail = async (req, res) => {
 // DELETE service detail by ID
 exports.deleteServiceDetail = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { serviceId, id } = req.params; // Get both serviceId and detail id from URL
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "معرف تفاصيل الخدمة غير صحيح" });
     }
 
+    if (!mongoose.Types.ObjectId.isValid(serviceId)) {
+      return res.status(400).json({ message: "معرف الخدمة غير صحيح" });
+    }
+
     const content = await Content.findOne();
-    if (!content || !content.services || !content.services.details) {
+    if (!content || !content.services) {
+      return res.status(404).json({ message: "المحتوى غير موجود" });
+    }
+
+    // Verify service exists
+    if (!content.services.items || !Array.isArray(content.services.items)) {
+      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    }
+
+    const searchServiceId = serviceId.toString();
+    const serviceExists = content.services.items.some((item) => {
+      if (item._id) {
+        const itemId = item._id.toString ? item._id.toString() : String(item._id);
+        return itemId === searchServiceId;
+      }
+      return false;
+    });
+
+    if (!serviceExists) {
+      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    }
+
+    // Find the detail
+    if (!content.services.details || !Array.isArray(content.services.details)) {
       return res.status(404).json({ message: "تفاصيل الخدمة غير موجودة" });
     }
 
-    const detail = content.services.details.find(
-      (detail) => detail._id && detail._id.toString() === id
-    );
+    const searchDetailId = id.toString();
+    let detail = null;
+
+    for (const currentDetail of content.services.details) {
+      if (currentDetail._id) {
+        const detailId = currentDetail._id.toString ? currentDetail._id.toString() : String(currentDetail._id);
+        if (detailId === searchDetailId) {
+          // Verify this detail belongs to the service
+          if (currentDetail.serviceItemId) {
+            const detailServiceId = currentDetail.serviceItemId.toString 
+              ? currentDetail.serviceItemId.toString() 
+              : String(currentDetail.serviceItemId);
+            if (detailServiceId !== searchServiceId) {
+              return res.status(400).json({ message: "هذه التفاصيل لا تنتمي للخدمة المحددة" });
+            }
+          }
+          detail = currentDetail;
+          break;
+        }
+      }
+    }
+
     if (!detail) {
       return res.status(404).json({ message: "تفاصيل الخدمة غير موجودة" });
     }
@@ -605,6 +679,124 @@ exports.deleteServiceDetail = async (req, res) => {
     res.json({
       message: "تم حذف تفاصيل الخدمة بنجاح",
       data: updated.services.details,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// GET service item by ID with its details
+exports.getServiceItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "معرف الخدمة غير صحيح" });
+    }
+
+    const content = await Content.findOne();
+    if (!content || !content.services) {
+      return res.status(404).json({ message: "قسم الخدمات غير موجود" });
+    }
+
+    if (!content.services.items || !Array.isArray(content.services.items)) {
+      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    }
+
+    // Find service item
+    const searchId = id.toString();
+    let serviceItem = null;
+
+    for (const item of content.services.items) {
+      if (item._id) {
+        const itemId = item._id.toString ? item._id.toString() : String(item._id);
+        if (itemId === searchId) {
+          serviceItem = item;
+          break;
+        }
+      }
+    }
+
+    if (!serviceItem) {
+      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    }
+
+    // Find related details
+    let relatedDetails = [];
+    if (content.services.details && Array.isArray(content.services.details)) {
+      relatedDetails = content.services.details.filter((detail) => {
+        if (detail.serviceItemId) {
+          const detailServiceId = detail.serviceItemId.toString 
+            ? detail.serviceItemId.toString() 
+            : String(detail.serviceItemId);
+          return detailServiceId === searchId;
+        }
+        return false;
+      });
+    }
+
+    res.json({
+      message: "تم جلب الخدمة بنجاح",
+      data: {
+        service: serviceItem,
+        details: relatedDetails,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
+};
+
+// GET service details by service ID
+exports.getServiceDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "معرف الخدمة غير صحيح" });
+    }
+
+    const content = await Content.findOne();
+    if (!content || !content.services) {
+      return res.status(404).json({ message: "قسم الخدمات غير موجود" });
+    }
+
+    // Verify service exists
+    if (!content.services.items || !Array.isArray(content.services.items)) {
+      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    }
+
+    const searchId = id.toString();
+    const serviceExists = content.services.items.some((item) => {
+      if (item._id) {
+        const itemId = item._id.toString ? item._id.toString() : String(item._id);
+        return itemId === searchId;
+      }
+      return false;
+    });
+
+    if (!serviceExists) {
+      return res.status(404).json({ message: "الخدمة غير موجودة" });
+    }
+
+    // Get all details for this service
+    let details = [];
+    if (content.services.details && Array.isArray(content.services.details)) {
+      details = content.services.details.filter((detail) => {
+        if (detail.serviceItemId) {
+          const detailServiceId = detail.serviceItemId.toString 
+            ? detail.serviceItemId.toString() 
+            : String(detail.serviceItemId);
+          return detailServiceId === searchId;
+        }
+        return false;
+      });
+    }
+
+    res.json({
+      message: "تم جلب تفاصيل الخدمة بنجاح",
+      data: details,
+      count: details.length,
     });
   } catch (err) {
     res.status(500).json({ message: "خطأ في الخادم", error: err.message });

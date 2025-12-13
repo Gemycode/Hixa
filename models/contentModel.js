@@ -48,6 +48,7 @@ const ContentSchema = new mongoose.Schema(
           image: { type: String, default: "" },
           sectionKey: { type: String, default: "" }, // e.g., section1, section2
           categoryKey: { type: String, default: "" }, // e.g., general, engineering, products
+          serviceItemId: { type: mongoose.Schema.Types.ObjectId, ref: "services.items", default: null }, // Link to service item
         },
       ],
     },

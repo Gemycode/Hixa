@@ -127,6 +127,7 @@ const validateServices = (req, res, next) => {
           image: Joi.string().uri().allow("").optional(),
           sectionKey: Joi.string().max(100).optional(),
           categoryKey: Joi.string().max(100).optional(),
+          serviceItemId: Joi.string().allow("", null).optional(),
         })
       )
       .optional(),
@@ -162,6 +163,7 @@ const validateServiceDetail = (req, res, next) => {
     image: Joi.string().uri().allow("").optional(),
     sectionKey: Joi.string().max(100).optional(),
     categoryKey: Joi.string().max(100).optional(),
+    serviceItemId: Joi.string().allow("", null).optional(), // Link to service item
   });
 
   const { error } = schema.validate(req.body);

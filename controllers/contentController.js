@@ -287,15 +287,48 @@ exports.deleteServiceItem = async (req, res) => {
       return res.status(404).json({ message: "الخدمة غير موجودة" });
     }
 
+    // Find and delete all related details (if serviceItemId exists) or by sectionKey/categoryKey
+    // First, try to find details by serviceItemId
+    let detailsToDelete = [];
+    if (content.services.details) {
+      detailsToDelete = content.services.details.filter(
+        (detail) => detail.serviceItemId && detail.serviceItemId.toString() === id
+      );
+    }
+
+    // Delete images from Cloudinary for related details
+    for (const detail of detailsToDelete) {
+      if (detail.image && detail.image.includes("cloudinary.com")) {
+        try {
+          await deleteFromCloudinary(detail.image);
+        } catch (err) {
+          console.error("Error deleting image from Cloudinary:", err);
+        }
+      }
+    }
+
+    // Delete the service item and all related details
+    const updateOperations = {
+      $pull: { 
+        "services.items": { _id: new mongoose.Types.ObjectId(id) }
+      }
+    };
+
+    // If there are details with serviceItemId, delete them too
+    if (detailsToDelete.length > 0) {
+      updateOperations.$pull["services.details"] = { serviceItemId: new mongoose.Types.ObjectId(id) };
+    }
+
     const updated = await Content.findOneAndUpdate(
       {},
-      { $pull: { "services.items": { _id: new mongoose.Types.ObjectId(id) } } },
+      updateOperations,
       { new: true }
     );
 
     res.json({
-      message: "تم حذف الخدمة بنجاح",
+      message: `تم حذف الخدمة بنجاح${detailsToDelete.length > 0 ? ` وتم حذف ${detailsToDelete.length} من التفاصيل المرتبطة` : ""}`,
       data: updated.services.items,
+      deletedDetailsCount: detailsToDelete.length,
     });
   } catch (err) {
     res.status(500).json({ message: "خطأ في الخادم", error: err.message });
@@ -305,8 +338,27 @@ exports.deleteServiceItem = async (req, res) => {
 // ADD new service detail
 exports.addServiceDetail = async (req, res) => {
   try {
-    const { title_en, title_ar, details_en, details_ar, image, sectionKey, categoryKey } = req.body;
+    const { title_en, title_ar, details_en, details_ar, image, sectionKey, categoryKey, serviceItemId } = req.body;
     let imageUrl = image;
+
+    // Validate serviceItemId if provided
+    if (serviceItemId && !mongoose.Types.ObjectId.isValid(serviceItemId)) {
+      return res.status(400).json({ message: "معرف الخدمة المرتبطة غير صحيح" });
+    }
+
+    // Verify service item exists if serviceItemId is provided
+    if (serviceItemId) {
+      const content = await Content.findOne();
+      if (!content || !content.services || !content.services.items) {
+        return res.status(404).json({ message: "الخدمة المرتبطة غير موجودة" });
+      }
+      const serviceItem = content.services.items.find(
+        (item) => item._id && item._id.toString() === serviceItemId
+      );
+      if (!serviceItem) {
+        return res.status(404).json({ message: "الخدمة المرتبطة غير موجودة" });
+      }
+    }
 
     // Handle file upload if image file is provided
     if (req.file) {
@@ -322,6 +374,7 @@ exports.addServiceDetail = async (req, res) => {
       image: imageUrl || "",
       sectionKey: sectionKey || "",
       categoryKey: categoryKey || "",
+      serviceItemId: serviceItemId ? new mongoose.Types.ObjectId(serviceItemId) : undefined,
     };
 
     const updated = await Content.findOneAndUpdate(
@@ -349,7 +402,7 @@ exports.updateServiceDetail = async (req, res) => {
       return res.status(400).json({ message: "معرف تفاصيل الخدمة غير صحيح" });
     }
 
-    const { title_en, title_ar, details_en, details_ar, image, sectionKey, categoryKey } = req.body;
+    const { title_en, title_ar, details_en, details_ar, image, sectionKey, categoryKey, serviceItemId } = req.body;
 
     const content = await Content.findOne();
     if (!content || !content.services || !content.services.details) {
@@ -362,6 +415,26 @@ exports.updateServiceDetail = async (req, res) => {
 
     if (detailIndex === -1) {
       return res.status(404).json({ message: "تفاصيل الخدمة غير موجودة" });
+    }
+
+    // Validate serviceItemId if provided
+    if (serviceItemId !== undefined) {
+      if (serviceItemId && !mongoose.Types.ObjectId.isValid(serviceItemId)) {
+        return res.status(400).json({ message: "معرف الخدمة المرتبطة غير صحيح" });
+      }
+      
+      // Verify service item exists if serviceItemId is provided
+      if (serviceItemId) {
+        if (!content.services.items) {
+          return res.status(404).json({ message: "الخدمة المرتبطة غير موجودة" });
+        }
+        const serviceItem = content.services.items.find(
+          (item) => item._id && item._id.toString() === serviceItemId
+        );
+        if (!serviceItem) {
+          return res.status(404).json({ message: "الخدمة المرتبطة غير موجودة" });
+        }
+      }
     }
 
     const currentDetail = content.services.details[detailIndex];
@@ -385,6 +458,11 @@ exports.updateServiceDetail = async (req, res) => {
     if (imageUrl !== undefined) updateFields[`services.details.${detailIndex}.image`] = imageUrl;
     if (sectionKey !== undefined) updateFields[`services.details.${detailIndex}.sectionKey`] = sectionKey;
     if (categoryKey !== undefined) updateFields[`services.details.${detailIndex}.categoryKey`] = categoryKey;
+    if (serviceItemId !== undefined) {
+      updateFields[`services.details.${detailIndex}.serviceItemId`] = serviceItemId 
+        ? new mongoose.Types.ObjectId(serviceItemId) 
+        : null;
+    }
 
     const updated = await Content.findOneAndUpdate(
       {},

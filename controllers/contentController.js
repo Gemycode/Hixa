@@ -166,22 +166,47 @@ exports.updateServices = async (req, res) => {
     
     const parsedItems = parseArray(items);
     if (parsedItems !== undefined) {
+      // Get current content to preserve existing details
+      const currentContent = await Content.findOne();
+      const existingDetails = currentContent?.services?.details || [];
+      const existingItems = currentContent?.services?.items || [];
+      
+      // Create a map of old IDs to new IDs for items that are being updated
+      const idMapping = new Map();
+      
       // Ensure all items have _id - preserve existing IDs or create new ones
       const itemsWithIds = parsedItems.map((item) => {
+        let newId;
         if (!item._id) {
           // If no _id provided, create a new one
-          item._id = new mongoose.Types.ObjectId();
+          newId = new mongoose.Types.ObjectId();
         } else if (typeof item._id === 'string') {
           // Convert string _id to ObjectId if needed
-          item._id = new mongoose.Types.ObjectId(item._id);
+          newId = new mongoose.Types.ObjectId(item._id);
+        } else {
+          newId = item._id;
         }
+        item._id = newId;
         return item;
       });
+      
+      // IMPORTANT: Preserve all existing details when updating items
+      // Only update details if they are explicitly provided in the request
+      // Otherwise, keep all existing details intact
+      if (parsedDetails === undefined) {
+        // If details are not being updated, preserve all existing details
+        // No need to do anything - existing details will remain in the database
+      }
+      
       updateFields["services.items"] = itemsWithIds;
     }
     
     const parsedDetails = parseArray(details);
     if (parsedDetails !== undefined) {
+      // Get current content to preserve existing details that are not being updated
+      const currentContent = await Content.findOne();
+      const existingDetails = currentContent?.services?.details || [];
+      
       // Ensure all details have _id - preserve existing IDs or create new ones
       const detailsWithIds = parsedDetails.map((detail) => {
         if (!detail._id) {
@@ -192,15 +217,54 @@ exports.updateServices = async (req, res) => {
         // Handle serviceItemId conversion
         if (detail.serviceItemId && typeof detail.serviceItemId === 'string') {
           detail.serviceItemId = new mongoose.Types.ObjectId(detail.serviceItemId);
+        } else if (!detail.serviceItemId && detail._id) {
+          // If serviceItemId is missing, try to find it from existing detail
+          const existingDetail = existingDetails.find((ed) => {
+            if (ed._id) {
+              const edId = ed._id.toString ? ed._id.toString() : String(ed._id);
+              const detailId = detail._id.toString ? detail._id.toString() : String(detail._id);
+              return edId === detailId;
+            }
+            return false;
+          });
+          if (existingDetail && existingDetail.serviceItemId) {
+            detail.serviceItemId = existingDetail.serviceItemId;
+          }
         }
         return detail;
       });
-      updateFields["services.details"] = detailsWithIds;
+      
+      // Merge with existing details that are not in the update (preserve details not being updated)
+      const updatedDetailIds = new Set(detailsWithIds.map(d => {
+        const dId = d._id.toString ? d._id.toString() : String(d._id);
+        return dId;
+      }));
+      
+      const preservedDetails = existingDetails.filter((ed) => {
+        if (ed._id) {
+          const edId = ed._id.toString ? ed._id.toString() : String(ed._id);
+          return !updatedDetailIds.has(edId);
+        }
+        return false;
+      });
+      
+      // Combine updated and preserved details
+      updateFields["services.details"] = [...detailsWithIds, ...preservedDetails];
     }
 
     // Only update if there are fields to update
     if (Object.keys(updateFields).length === 0) {
       return res.status(400).json({ message: "لم يتم إرسال أي بيانات للتحديث" });
+    }
+
+    // IMPORTANT: If updating items but not details, explicitly preserve existing details
+    // This ensures details are not lost when only items are updated
+    if (parsedItems !== undefined && parsedDetails === undefined) {
+      const currentContent = await Content.findOne();
+      if (currentContent && currentContent.services && currentContent.services.details) {
+        // Explicitly preserve all existing details
+        updateFields["services.details"] = currentContent.services.details;
+      }
     }
 
     const updated = await Content.findOneAndUpdate(

@@ -99,63 +99,7 @@ const validateAbout = (req, res, next) => {
 };
 
 // Services validation
-const validateServices = (req, res, next) => {
-  const schema = Joi.object({
-    title_en: Joi.string().max(200).optional(),
-    title_ar: Joi.string().max(200).optional(),
-    subtitle_en: Joi.string().max(1000).optional(),
-    subtitle_ar: Joi.string().max(1000).optional(),
-    items: Joi.array()
-      .items(
-        Joi.object({
-          title_en: Joi.string().max(200).optional(),
-          title_ar: Joi.string().max(200).optional(),
-          description_en: Joi.string().max(1000).optional(),
-          description_ar: Joi.string().max(1000).optional(),
-          icon: Joi.string().allow("").optional(),
-        })
-      )
-      .optional(),
-    details: Joi.array()
-      .items(
-        Joi.object({
-          _id: Joi.string().optional(),
-          title_en: Joi.string().max(200).optional(),
-          title_ar: Joi.string().max(200).optional(),
-          details_en: Joi.string().max(5000).optional(),
-          details_ar: Joi.string().max(5000).optional(),
-          image: Joi.string().uri().allow("").optional(),
-          sectionKey: Joi.string().max(100).optional(),
-          categoryKey: Joi.string().max(100).optional(),
-          serviceItemId: Joi.string().allow("", null).optional(),
-        })
-      )
-      .optional(),
-  });
-
-  const { error } = schema.validate(req.body);
-  if (error) return res.status(400).json({ message: error.details[0].message });
-  next();
-};
-
-// Services headers validation (only titles, no items or details)
-const validateServicesHeaders = (req, res, next) => {
-  const schema = Joi.object({
-    title_en: Joi.string().max(200).optional(),
-    title_ar: Joi.string().max(200).optional(),
-    subtitle_en: Joi.string().max(1000).optional(),
-    subtitle_ar: Joi.string().max(1000).optional(),
-  }).min(1).messages({
-    "object.min": "يجب إرسال حقل واحد على الأقل للتحديث",
-  });
-
-  const { error } = schema.validate(req.body);
-  if (error) return res.status(400).json({ message: error.details[0].message });
-  next();
-};
-
-// Service item validation
-const validateServiceItem = (req, res, next) => {
+const validateService = (req, res, next) => {
   const schema = Joi.object({
     title_en: Joi.string().max(200).optional(),
     title_ar: Joi.string().max(200).optional(),
@@ -177,9 +121,6 @@ const validateServiceDetail = (req, res, next) => {
     details_en: Joi.string().max(5000).optional(),
     details_ar: Joi.string().max(5000).optional(),
     image: Joi.string().uri().allow("").optional(),
-    sectionKey: Joi.string().max(100).optional(),
-    categoryKey: Joi.string().max(100).optional(),
-    serviceItemId: Joi.string().allow("", null).optional(), // Link to service item
   });
 
   const { error } = schema.validate(req.body);
@@ -706,9 +647,7 @@ module.exports = {
   validateLogin,
   validateHero,
   validateAbout,
-  validateServices,
-  validateServicesHeaders,
-  validateServiceItem,
+  validateService,
   validateServiceDetail,
   validateProjects,
   validateProjectItem,

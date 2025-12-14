@@ -168,22 +168,19 @@ exports.updateServices = async (req, res) => {
     const parsedDetails = parseArray(details);
     
     if (parsedItems !== undefined) {
-      // Get current content to preserve existing details
+      // Get current content to preserve existing items and details
       const currentContent = await Content.findOne();
       const existingDetails = currentContent?.services?.details || [];
       const existingItems = currentContent?.services?.items || [];
-      
-      // Create a map of old IDs to new IDs for items that are being updated
-      const idMapping = new Map();
       
       // Ensure all items have _id - preserve existing IDs or create new ones
       const itemsWithIds = parsedItems.map((item) => {
         let newId;
         if (!item._id) {
-          // If no _id provided, create a new one
+          // If no _id provided, create a new one (new item)
           newId = new mongoose.Types.ObjectId();
         } else if (typeof item._id === 'string') {
-          // Convert string _id to ObjectId if needed
+          // Convert string _id to ObjectId if needed (existing item being updated)
           newId = new mongoose.Types.ObjectId(item._id);
         } else {
           newId = item._id;
@@ -192,6 +189,26 @@ exports.updateServices = async (req, res) => {
         return item;
       });
       
+      // IMPORTANT: Merge updated items with existing items
+      // Keep existing items that are not in the update, and update/replace items that are in the update
+      const updatedItemIds = new Set(itemsWithIds.map(item => {
+        const itemId = item._id.toString ? item._id.toString() : String(item._id);
+        return itemId;
+      }));
+      
+      // Keep existing items that are NOT being updated
+      const preservedItems = existingItems.filter((existingItem) => {
+        if (existingItem._id) {
+          const existingId = existingItem._id.toString ? existingItem._id.toString() : String(existingItem._id);
+          return !updatedItemIds.has(existingId);
+        }
+        return false;
+      });
+      
+      // Combine updated/new items with preserved items
+      // Updated items come first, then preserved items
+      updateFields["services.items"] = [...itemsWithIds, ...preservedItems];
+      
       // IMPORTANT: Preserve all existing details when updating items
       // Only update details if they are explicitly provided in the request
       // Otherwise, keep all existing details intact
@@ -199,8 +216,6 @@ exports.updateServices = async (req, res) => {
         // If details are not being updated, preserve all existing details
         // No need to do anything - existing details will remain in the database
       }
-      
-      updateFields["services.items"] = itemsWithIds;
     }
     if (parsedDetails !== undefined) {
       // Get current content to preserve existing details that are not being updated

@@ -165,6 +165,8 @@ exports.updateServices = async (req, res) => {
     if (subtitle_ar !== undefined) updateFields["services.subtitle_ar"] = subtitle_ar;
     
     const parsedItems = parseArray(items);
+    const parsedDetails = parseArray(details);
+    
     if (parsedItems !== undefined) {
       // Get current content to preserve existing details
       const currentContent = await Content.findOne();
@@ -200,8 +202,6 @@ exports.updateServices = async (req, res) => {
       
       updateFields["services.items"] = itemsWithIds;
     }
-    
-    const parsedDetails = parseArray(details);
     if (parsedDetails !== undefined) {
       // Get current content to preserve existing details that are not being updated
       const currentContent = await Content.findOne();

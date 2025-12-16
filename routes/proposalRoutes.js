@@ -10,10 +10,27 @@ const {
 const { protect, restrictTo } = require("../middleware/auth");
 const { validateProposalCreate, validateProposalStatusUpdate } = require("../middleware/validate");
 
+// Middleware to map projectId from params into body for validation/handler
+const setProjectIdFromParams = (req, res, next) => {
+  if (req.params.projectId) {
+    req.body.projectId = req.params.projectId;
+  }
+  next();
+};
+
 // All proposal routes require authentication
 router.use(protect);
 
-// Engineer: submit proposal
+// Engineer: submit proposal (preferred: projectId in path)
+router.post(
+  "/project/:projectId",
+  restrictTo("engineer"),
+  setProjectIdFromParams,
+  validateProposalCreate,
+  createProposal
+);
+
+// (Legacy) Engineer: submit proposal with projectId in body
 router.post("/", restrictTo("engineer"), validateProposalCreate, createProposal);
 
 // Engineer: my proposals

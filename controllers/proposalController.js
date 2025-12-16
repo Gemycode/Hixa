@@ -141,3 +141,54 @@ exports.updateProposalStatus = async (req, res, next) => {
   }
 };
 
+// Update proposal (admin anytime, engineer within 1 hour of creation)
+exports.updateProposal = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { description, estimatedTimeline, relevantExperience, proposedBudget, status } = req.body;
+
+    const proposal = await Proposal.findById(id);
+    if (!proposal) {
+      return res.status(404).json({ message: "العرض غير موجود" });
+    }
+
+    const isAdmin = req.user.role === "admin";
+    const isOwner = proposal.engineer.toString() === req.user._id.toString();
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ message: "غير مسموح بتعديل هذا العرض" });
+    }
+
+    // Engineer can update only within 1 hour of creation
+    if (!isAdmin) {
+      const oneHourMs = 60 * 60 * 1000;
+      const diff = Date.now() - new Date(proposal.createdAt).getTime();
+      if (diff > oneHourMs) {
+        return res.status(403).json({ message: "انتهت مدة التعديل على العرض (ساعة واحدة من وقت الإنشاء)" });
+      }
+    }
+
+    // Apply updates
+    if (description !== undefined) proposal.description = description;
+    if (estimatedTimeline !== undefined) proposal.estimatedTimeline = estimatedTimeline;
+    if (relevantExperience !== undefined) proposal.relevantExperience = relevantExperience;
+    if (proposedBudget !== undefined) {
+      proposal.proposedBudget = { ...proposal.proposedBudget, ...proposedBudget };
+    }
+
+    // Only admin can change status via this endpoint
+    if (status !== undefined && isAdmin) {
+      proposal.status = status;
+    }
+
+    await proposal.save();
+
+    res.json({
+      message: "تم تحديث العرض بنجاح",
+      data: sanitizeProposal(proposal),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

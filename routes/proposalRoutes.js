@@ -6,9 +6,14 @@ const {
   getProposalsByProject,
   getMyProposals,
   updateProposalStatus,
+  updateProposal,
 } = require("../controllers/proposalController");
 const { protect, restrictTo } = require("../middleware/auth");
-const { validateProposalCreate, validateProposalStatusUpdate } = require("../middleware/validate");
+const {
+  validateProposalCreate,
+  validateProposalStatusUpdate,
+  validateProposalUpdate,
+} = require("../middleware/validate");
 
 // Middleware to map projectId from params into body for validation/handler
 const setProjectIdFromParams = (req, res, next) => {
@@ -38,6 +43,9 @@ router.get("/my", restrictTo("engineer"), getMyProposals);
 
 // Project proposals (admin and project owner see all, engineer sees own - handled in controller)
 router.get("/project/:projectId", getProposalsByProject);
+
+// Update proposal (admin anytime, engineer within 1 hour)
+router.put("/:id", restrictTo("admin", "engineer"), validateProposalUpdate, updateProposal);
 
 // Admin: update proposal status
 router.put("/:id/status", restrictTo("admin"), validateProposalStatusUpdate, updateProposalStatus);

@@ -656,6 +656,31 @@ const validateProposalStatusUpdate = (req, res, next) => {
   next();
 };
 
+// Proposal update (engineer/admin)
+const validateProposalUpdate = (req, res, next) => {
+  const schema = Joi.object({
+    description: Joi.string().trim().max(5000).optional(),
+    estimatedTimeline: Joi.string().trim().max(200).optional(),
+    relevantExperience: Joi.string().trim().max(3000).optional(),
+    proposedBudget: Joi.object({
+      amount: Joi.number().min(0).optional(),
+      currency: Joi.string().trim().max(10).optional(),
+    }).optional(),
+    // status intentionally omitted here; handled separately for admin
+  })
+    .min(1)
+    .messages({
+      "object.min": "يجب إرسال حقل واحد على الأقل للتحديث",
+    });
+
+  const { error } = schema.validate(req.body, { abortEarly: false });
+  if (error) {
+    const messages = error.details.map((detail) => detail.message).join(", ");
+    return res.status(400).json({ message: messages });
+  }
+  next();
+};
+
 // Profile update validation (for /me) - safer, excludes role/isActive/password
 const validateProfileUpdate = (req, res, next) => {
   const schema = Joi.object({
@@ -720,4 +745,5 @@ module.exports = {
   validateServiceOrderUpdate,
   validateProposalCreate,
   validateProposalStatusUpdate,
+  validateProposalUpdate,
 };

@@ -607,6 +607,55 @@ const validateProjectUpdate = (req, res, next) => {
   next();
 };
 
+// Proposal validation
+const validateProposalCreate = (req, res, next) => {
+  const schema = Joi.object({
+    projectId: Joi.string().required().messages({
+      "any.required": "معرف المشروع مطلوب",
+      "string.base": "معرف المشروع غير صحيح",
+    }),
+    description: Joi.string().trim().max(5000).required().messages({
+      "any.required": "وصف العرض مطلوب",
+      "string.max": "وصف العرض يجب ألا يتجاوز 5000 حرف",
+    }),
+    estimatedTimeline: Joi.string().trim().max(200).required().messages({
+      "any.required": "المدة المتوقعة مطلوبة",
+      "string.max": "المدة يجب ألا تتجاوز 200 حرف",
+    }),
+    relevantExperience: Joi.string().trim().max(3000).optional(),
+    proposedBudget: Joi.object({
+      amount: Joi.number().min(0).optional(),
+      currency: Joi.string().trim().max(10).optional(),
+    }).optional(),
+  });
+
+  const { error } = schema.validate(req.body, { abortEarly: false });
+  if (error) {
+    const messages = error.details.map((detail) => detail.message).join(", ");
+    return res.status(400).json({ message: messages });
+  }
+  next();
+};
+
+const validateProposalStatusUpdate = (req, res, next) => {
+  const schema = Joi.object({
+    status: Joi.string()
+      .valid("pending", "reviewed", "accepted", "rejected")
+      .required()
+      .messages({
+        "any.required": "حالة العرض مطلوبة",
+        "any.only": "حالة العرض غير صحيحة",
+      }),
+  });
+
+  const { error } = schema.validate(req.body, { abortEarly: false });
+  if (error) {
+    const messages = error.details.map((detail) => detail.message).join(", ");
+    return res.status(400).json({ message: messages });
+  }
+  next();
+};
+
 // Profile update validation (for /me) - safer, excludes role/isActive/password
 const validateProfileUpdate = (req, res, next) => {
   const schema = Joi.object({
@@ -669,4 +718,6 @@ module.exports = {
   validateWorkUpdate,
   validateServiceOrderCreate,
   validateServiceOrderUpdate,
+  validateProposalCreate,
+  validateProposalStatusUpdate,
 };

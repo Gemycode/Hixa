@@ -18,6 +18,7 @@ const subscriberRoutes = require("./routes/subscriberRoutes");
 const projectRoutes = require("./routes/projectRoutes");
 const portfolioRoutes = require("./routes/portfolioRoutes");
 const serviceOrderRoutes = require("./routes/serviceOrderRoutes");
+const proposalRoutes = require("./routes/proposalRoutes");
 
 const app = express();
 
@@ -99,6 +100,7 @@ app.use("/api/subscribers", subscriberRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/portfolio", portfolioRoutes);
 app.use("/api/service-orders", serviceOrderRoutes);
+app.use("/api/proposals", proposalRoutes);
 
 // 404 handler (route not found)
 app.use((req, res) => {

@@ -881,6 +881,39 @@ const validateClientRegister = (req, res, next) => {
   next();
 };
 
+// Password change validation
+const validatePasswordChange = (req, res, next) => {
+  const schema = Joi.object({
+    currentPassword: Joi.string().required().messages({
+      "any.required": "كلمة المرور الحالية مطلوبة",
+    }),
+    newPassword: Joi.string()
+      .min(8)
+      .pattern(passwordRegex)
+      .required()
+      .messages({
+        "string.min": "كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل",
+        "string.pattern.base":
+          "كلمة المرور الجديدة يجب أن تحتوي على حرف كبير، حرف صغير، ورقم واحد على الأقل",
+        "any.required": "كلمة المرور الجديدة مطلوبة",
+      }),
+    confirmNewPassword: Joi.string()
+      .valid(Joi.ref("newPassword"))
+      .required()
+      .messages({
+        "any.only": "تأكيد كلمة المرور غير متطابق",
+        "any.required": "تأكيد كلمة المرور الجديدة مطلوب",
+      }),
+  });
+
+  const { error } = schema.validate(req.body, { abortEarly: false });
+  if (error) {
+    const messages = error.details.map((detail) => detail.message).join(", ");
+    return res.status(400).json({ message: messages });
+  }
+  next();
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -914,4 +947,5 @@ module.exports = {
   validateProposalCreate,
   validateProposalStatusUpdate,
   validateProposalUpdate,
+  validatePasswordChange,
 };

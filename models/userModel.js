@@ -16,27 +16,36 @@ const UserSchema = new mongoose.Schema(
     nationalId: { type: String, trim: true, maxlength: 20, unique: true, sparse: true }, // الرقم القومي
     location: { type: String, trim: true, maxlength: 200 },
     bio: { type: String, trim: true, maxlength: 1000 },
-  specializations: [
-    {
-      type: String,
-      trim: true,
-      maxlength: 100,
-    },
-  ],
-  certifications: [
-    {
-      title: { type: String, trim: true, maxlength: 200 },
-      year: { type: Number, min: 1900, max: 2100 },
-    },
-  ],
-  averageRating: { type: Number, default: 0 },
-  reviewsCount: { type: Number, default: 0 },
+    specializations: [
+      {
+        type: String,
+        trim: true,
+        maxlength: 100,
+      },
+    ],
+    certifications: [
+      {
+        title: { type: String, trim: true, maxlength: 200 },
+        year: { type: Number, min: 1900, max: 2100 },
+      },
+    ],
+    averageRating: { type: Number, default: 0 },
+    reviewsCount: { type: Number, default: 0 },
     avatar: {
       url: { type: String, trim: true },
       uploadedAt: { type: Date, default: Date.now },
     },
     isActive: { type: Boolean, default: true },
     lastLogin: { type: Date },
+    // Remember Me tokens
+    rememberTokens: [
+      {
+        token: { type: String, required: true },
+        expiresAt: { type: Date, required: true },
+        userAgent: { type: String },
+        ipAddress: { type: String },
+      },
+    ],
   },
   { timestamps: true }
 );
@@ -45,6 +54,7 @@ const UserSchema = new mongoose.Schema(
 // Note: email already has unique index from schema definition, so we don't need to add it again
 UserSchema.index({ role: 1 });
 UserSchema.index({ licenseNumber: 1 }); // Index for license number queries
+UserSchema.index({ "rememberTokens.token": 1 }); // Index for remember tokens
 
 UserSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();

@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const rateLimit = require("express-rate-limit");
+const crypto = require("crypto");
 const User = require("../models/userModel");
 
 // Rate limiter for failed login attempts (based on IP)
@@ -26,10 +27,15 @@ const generateToken = (userId, role) => {
   );
 };
 
+// Helper function to generate Remember Me token
+const generateRememberToken = () => {
+  return crypto.randomBytes(40).toString('hex');
+};
+
 // Login user
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body;
 
     // Find user with password field
     const user = await User.findOne({ email }).select("+password");
@@ -60,6 +66,25 @@ const login = async (req, res) => {
     // Generate token
     const token = generateToken(user._id, user.role);
 
+    let refreshToken = null;
+    
+    // Handle Remember Me functionality
+    if (rememberMe) {
+      refreshToken = generateRememberToken();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30); // 30 days expiration
+      
+      // Add remember token to user
+      user.rememberTokens.push({
+        token: refreshToken,
+        expiresAt: expiresAt,
+        userAgent: req.get('User-Agent'),
+        ipAddress: req.ip,
+      });
+      
+      await user.save({ validateBeforeSave: false });
+    }
+
     // Update last login
     user.lastLogin = new Date();
     await user.save({ validateBeforeSave: false });
@@ -85,8 +110,58 @@ const login = async (req, res) => {
     res.json({
       message: "تم تسجيل الدخول بنجاح",
       token,
+      refreshToken: rememberMe ? refreshToken : undefined,
       user: userResponse,
     });
+  } catch (error) {
+    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
+  }
+};
+
+// Change password
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword, confirmNewPassword } = req.body;
+    const userId = req.user.id;
+
+    // Validate input
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      return res.status(400).json({ 
+        message: "جميع الحقول مطلوبة: كلمة المرور الحالية، كلمة المرور الجديدة، وتأكيد كلمة المرور الجديدة" 
+      });
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      return res.status(400).json({ 
+        message: "كلمة المرور الجديدة وتأكيد كلمة المرور غير متطابقين" 
+      });
+    }
+
+    // Get user with password
+    const user = await User.findById(userId).select("+password");
+    if (!user) {
+      return res.status(404).json({ message: "المستخدم غير موجود" });
+    }
+
+    // Check current password
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({ message: "كلمة المرور الحالية غير صحيحة" });
+    }
+
+    // Check if new password is different from current password
+    const isNewDifferent = !(await user.comparePassword(newPassword));
+    if (!isNewDifferent) {
+      return res.status(400).json({ 
+        message: "كلمة المرور الجديدة يجب أن تكون مختلفة عن كلمة المرور الحالية" 
+      });
+    }
+
+    // Update password
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: "تم تغيير كلمة المرور بنجاح" });
   } catch (error) {
     res.status(500).json({ message: "خطأ في الخادم", error: error.message });
   }
@@ -304,4 +379,4 @@ const registerClient = async (req, res) => {
   }
 };
 
-module.exports = { register, login, registerCompany, registerEngineer, registerClient };
+module.exports = { register, login, registerCompany, registerEngineer, registerClient, changePassword };

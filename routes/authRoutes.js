@@ -8,6 +8,7 @@ const {
   registerCompany,
   registerEngineer,
   registerClient,
+  changePassword,
 } = require("../controllers/authController");
 const {
   validateRegister,
@@ -15,7 +16,9 @@ const {
   validateCompanyRegister,
   validateEngineerRegister,
   validateClientRegister,
+  validatePasswordChange,
 } = require("../middleware/validate");
+const { protect } = require("../middleware/auth");
 
 // General API rate limiting (less restrictive)
 const apiLimiter = rateLimit({
@@ -37,5 +40,8 @@ router.post("/register/client", validateClientRegister, registerClient);
 
 // Login route (uses specialized rate limiting in controller)
 router.post("/login", validateLogin, login);
+
+// Change password route (protected)
+router.put("/change-password", protect, validatePasswordChange, changePassword);
 
 module.exports = router;

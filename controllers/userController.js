@@ -111,6 +111,12 @@ const createUser = async (req, res, next) => {
   try {
     const { email, password, name, phone, nationalId, role, isActive } = req.body;
 
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
+    }
+
     const user = await User.create({
       email,
       password,
@@ -126,6 +132,9 @@ const createUser = async (req, res, next) => {
       user: sanitizeUser(user),
     });
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
+    }
     next(error);
   }
 };
@@ -181,6 +190,9 @@ const getUserById = async (req, res, next) => {
     }
     res.json({ data: sanitizeUser(user) });
   } catch (error) {
+    if (error.name === "CastError") {
+      return res.status(400).json({ message: "معرف المستخدم غير صحيح" });
+    }
     next(error);
   }
 };
@@ -191,12 +203,28 @@ const updateUser = async (req, res, next) => {
     const { id } = req.params;
     const updates = {};
 
-    ["email", "name", "phone", "nationalId", "role", "isActive"].forEach((field) => {
+    // Prevent changing certain fields
+    const allowedUpdates = ["email", "name", "phone", "nationalId", "role", "isActive", "location", "bio"];
+    
+    // Check for invalid fields
+    const invalidFields = Object.keys(req.body).filter(
+      (field) => !allowedUpdates.includes(field) && field !== "password"
+    );
+    
+    if (invalidFields.length > 0) {
+      return res.status(400).json({ 
+        message: `الحقول التالية غير مسموحة: ${invalidFields.join(", ")}` 
+      });
+    }
+
+    // Add allowed updates to the updates object
+    allowedUpdates.forEach((field) => {
       if (typeof req.body[field] !== "undefined") {
         updates[field] = req.body[field];
       }
     });
 
+    // Handle password update separately
     if (req.body.password) {
       updates.password = req.body.password;
     }
@@ -207,6 +235,11 @@ const updateUser = async (req, res, next) => {
       return res.status(404).json({ message: "المستخدم غير موجود" });
     }
 
+    // Prevent user from updating themselves to admin
+    if (req.user.id === id && req.body.role === "admin" && req.user.role !== "admin") {
+      return res.status(403).json({ message: "غير مسموح لك بتحديث دورك إلى مدير" });
+    }
+
     Object.assign(user, updates);
     await user.save();
 
@@ -215,6 +248,12 @@ const updateUser = async (req, res, next) => {
       user: sanitizeUser(user),
     });
   } catch (error) {
+    if (error.name === "CastError") {
+      return res.status(400).json({ message: "معرف المستخدم غير صحيح" });
+    }
+    if (error.code === 11000) {
+      return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
+    }
     next(error);
   }
 };
@@ -222,12 +261,80 @@ const updateUser = async (req, res, next) => {
 // Delete user
 const deleteUser = async (req, res, next) => {
   try {
-    const user = await User.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
+    
+    // Prevent users from deleting themselves
+    if (req.user.id === id) {
+      return res.status(400).json({ message: "لا يمكنك حذف حسابك الخاص" });
+    }
+
+    const user = await User.findByIdAndDelete(id);
     if (!user) {
       return res.status(404).json({ message: "المستخدم غير موجود" });
     }
+    
     res.json({ message: "تم حذف المستخدم بنجاح" });
   } catch (error) {
+    if (error.name === "CastError") {
+      return res.status(400).json({ message: "معرف المستخدم غير صحيح" });
+    }
+    next(error);
+  }
+};
+
+// Bulk delete users (admin only)
+const bulkDeleteUsers = async (req, res, next) => {
+  try {
+    const { ids } = req.body;
+    
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "يجب تقديم مصفوفة من معرفات المستخدمين" });
+    }
+    
+    // Prevent deleting oneself
+    if (ids.includes(req.user.id)) {
+      return res.status(400).json({ message: "لا يمكنك حذف حسابك الخاص" });
+    }
+    
+    const result = await User.deleteMany({ _id: { $in: ids } });
+    
+    res.json({ 
+      message: `تم حذف ${result.deletedCount} مستخدم بنجاح`,
+      deletedCount: result.deletedCount 
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Toggle user activation status (admin only)
+const toggleUserActivation = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    // Prevent users from toggling their own activation
+    if (req.user.id === id) {
+      return res.status(400).json({ message: "لا يمكنك تغيير حالة تفعيل حسابك الخاص" });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: "المستخدم غير موجود" });
+    }
+    
+    user.isActive = !user.isActive;
+    await user.save();
+    
+    res.json({
+      message: user.isActive 
+        ? "تم تفعيل المستخدم بنجاح" 
+        : "تم إلغاء تفعيل المستخدم بنجاح",
+      user: sanitizeUser(user)
+    });
+  } catch (error) {
+    if (error.name === "CastError") {
+      return res.status(400).json({ message: "معرف المستخدم غير صحيح" });
+    }
     next(error);
   }
 };
@@ -240,5 +347,6 @@ module.exports = {
   deleteUser,
   getProfile,
   updateProfile,
+  bulkDeleteUsers,
+  toggleUserActivation
 };
-

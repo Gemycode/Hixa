@@ -9,6 +9,8 @@ const {
   deleteUser,
   getProfile,
   updateProfile,
+  bulkDeleteUsers,
+  toggleUserActivation
 } = require("../controllers/userController");
 const { protect, adminOnly } = require("../middleware/auth");
 const { validateUserCreate, validateUserUpdate, validateProfileUpdate } = require("../middleware/validate");
@@ -29,5 +31,8 @@ router.get("/:id", getUserById);
 router.put("/:id", validateUserUpdate, updateUser);
 router.delete("/:id", deleteUser);
 
-module.exports = router;
+// New admin routes
+router.post("/bulk-delete", bulkDeleteUsers);
+router.patch("/:id/toggle-activation", toggleUserActivation);
 
+module.exports = router;

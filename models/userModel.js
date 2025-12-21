@@ -5,8 +5,13 @@ const UserSchema = new mongoose.Schema(
   {
     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
     password: { type: String, required: true, select: false },
-    role: { type: String, enum: ["admin", "engineer", "client", "customer"], default: "customer" },
+    role: { type: String, enum: ["admin", "engineer", "client", "company"], default: "client" },
     name: { type: String, trim: true },
+    // Company specific fields
+    companyName: { type: String, trim: true, maxlength: 200 },
+    contactPersonName: { type: String, trim: true, maxlength: 200 },
+    // Engineer specific fields
+    licenseNumber: { type: String, trim: true, maxlength: 50, unique: true, sparse: true }, // رقم الرخصة المهنية
     phone: { type: String, trim: true, maxlength: 50 },
     nationalId: { type: String, trim: true, maxlength: 20, unique: true, sparse: true }, // الرقم القومي
     location: { type: String, trim: true, maxlength: 200 },
@@ -39,6 +44,7 @@ const UserSchema = new mongoose.Schema(
 // Index for faster queries
 // Note: email already has unique index from schema definition, so we don't need to add it again
 UserSchema.index({ role: 1 });
+UserSchema.index({ licenseNumber: 1 }); // Index for license number queries
 
 UserSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();

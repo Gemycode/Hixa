@@ -117,7 +117,7 @@ const createUser = async (req, res, next) => {
       name: name || email.split("@")[0],
       phone: phone || "",
       nationalId: nationalId || "",
-      role: role || "customer",
+      role: role || "client",
       ...(typeof isActive !== "undefined" && { isActive }),
     });
 

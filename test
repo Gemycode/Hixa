@@ -1,0 +1,116 @@
+<!-- تحميل الخط -->
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!-- زرار فتح المودال -->
+<button id="openBookModal3" class="book-btn">
+اذهب الي روابط المكتبة
+</button>
+
+<!-- المودال -->
+<div id="bookModal3" class="modal-overlay">
+
+  <div class="modal-box">
+    
+    <!-- زر الإغلاق -->
+   <span id="closeBookModal3" class="close-btn">×</span>
+
+    <h3>الديانة الداروينية</h3>
+
+    <p>
+         يستعرض هذا الكتاب فكرة الداروينية بشكل معمق، 
+      ويحلل نظرياتها وتأثيرها على الفكر والمجتمع، 
+      مع تقديم رؤية نقدية لفهم تطور الحياة والأفكار العلمية الحديثة.
+    </p>
+
+    <h4>روابط الكتاب</h4>
+    <ul>
+      <li><a href="https://www.amazon.sa/-/en/%D8%A7%D9%84%D8%AF%D9%8A%D8%A7%D9%86%D8%A9-%D8%A7%D9%84%D8%AF%D8%A7%D8%B1%D9%88%D9%8A%D9%86%D9%8A%D8%A9-%E2%80%8E%D9%87%D8%A7%D8%B1%D9%88%D9%86-%D9%8A%D8%AD%D9%8A%E2%80%8E/dp/6030050907" target="_blank">امازون</a></li>
+    </ul>
+
+  </div>
+</div>
+
+<style>
+/* الزرار */
+.book-btn {
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  background: #e8deca;
+  color: #ffffff;
+  border: none;
+  padding: 10px 24px;
+  cursor: pointer;
+  transition: 0.3s ease;
+  font-size: 36;
+  border-radius: 10px;
+}
+
+.book-btn:hover {
+  background: #red;
+  color: #173951;
+  
+}
+
+/* الخلفية */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+}
+
+/* صندوق المودال */
+.modal-box {
+  background: #ffffff;
+  width: 90%;
+  max-width: 600px;
+  padding: 24px;
+  border-radius: 8px;
+  direction: rtl;
+  position: relative;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  color: #173951;
+}
+
+/* زر الإغلاق */
+.close-btn {
+  position: absolute;
+  top: 10px;
+  left: 15px;
+  cursor: pointer;
+  font-size: 22px;
+  color: #173951;
+}
+
+/* الروابط */
+.modal-box a {
+  color: #173951;
+  text-decoration: none;
+}
+
+.modal-box a:hover {
+  text-decoration: underline;
+}
+</style>
+
+<script>
+document.getElementById("openBookModal3").onclick = function () {
+  document.getElementById("bookModal3").style.display = "flex";
+};
+
+document.getElementById("closebookModal3").onclick = function () {
+  document.getElementById("bookModal3").style.display = "none";
+};
+
+document.getElementById("bookModal3").onclick = function (e) {
+  if (e.target === this) {
+    this.style.display = "none";
+  }
+};
+</script>
+
+
+
+

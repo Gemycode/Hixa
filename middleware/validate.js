@@ -692,6 +692,11 @@ const validateProfileUpdate = (req, res, next) => {
     phone: Joi.string().trim().max(50),
     location: Joi.string().trim().max(200),
     bio: Joi.string().trim().max(1000),
+    // Company-specific fields
+    companyName: Joi.string().trim().max(200),
+    contactPersonName: Joi.string().trim().max(200),
+    // Engineer-specific fields
+    licenseNumber: Joi.string().trim().max(50),
     specializations: Joi.alternatives().try(
       Joi.array().items(Joi.string().trim().max(100)),
       Joi.string() // will be parsed in controller (JSON / comma / newline)

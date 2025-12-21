@@ -38,18 +38,30 @@ const { uploadToCloudinary } = require("../middleware/upload");
 
 const updateProfile = async (req, res, next) => {
   try {
-    const { name, email, phone, location, bio, specializations, certifications } = req.body;
+    const { name, email, phone, location, bio, specializations, certifications, 
+            companyName, contactPersonName, licenseNumber } = req.body;
 
     const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ message: "المستخدم غير موجود" });
     }
 
+    // Common fields for all users
     if (typeof name !== "undefined") user.name = name;
     if (typeof email !== "undefined") user.email = email;
     if (typeof phone !== "undefined") user.phone = phone;
     if (typeof location !== "undefined") user.location = location;
     if (typeof bio !== "undefined") user.bio = bio;
+
+    // Role-specific fields
+    if (user.role === "company") {
+      if (typeof companyName !== "undefined") user.companyName = companyName;
+      if (typeof contactPersonName !== "undefined") user.contactPersonName = contactPersonName;
+    }
+
+    if (user.role === "engineer") {
+      if (typeof licenseNumber !== "undefined") user.licenseNumber = licenseNumber;
+    }
 
     // Helper parsers
     const parseStringArray = (val) => {
@@ -339,6 +351,55 @@ const toggleUserActivation = async (req, res, next) => {
   }
 };
 
+// Change password for current user
+const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword, confirmNewPassword } = req.body;
+    const userId = req.user.id;
+
+    // Validate input
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      return res.status(400).json({ 
+        message: "جميع الحقول مطلوبة: كلمة المرور الحالية، كلمة المرور الجديدة، وتأكيد كلمة المرور الجديدة" 
+      });
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      return res.status(400).json({ 
+        message: "كلمة المرور الجديدة وتأكيد كلمة المرور غير متطابقين" 
+      });
+    }
+
+    // Get user with password
+    const user = await User.findById(userId).select("+password");
+    if (!user) {
+      return res.status(404).json({ message: "المستخدم غير موجود" });
+    }
+
+    // Check current password
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({ message: "كلمة المرور الحالية غير صحيحة" });
+    }
+
+    // Check if new password is different from current password
+    const isNewDifferent = !(await user.comparePassword(newPassword));
+    if (!isNewDifferent) {
+      return res.status(400).json({ 
+        message: "كلمة المرور الجديدة يجب أن تكون مختلفة عن كلمة المرور الحالية" 
+      });
+    }
+
+    // Update password
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: "تم تغيير كلمة المرور بنجاح" });
+  } catch (error) {
+    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
+  }
+};
+
 module.exports = {
   createUser,
   getUsers,
@@ -348,5 +409,6 @@ module.exports = {
   getProfile,
   updateProfile,
   bulkDeleteUsers,
-  toggleUserActivation
+  toggleUserActivation,
+  changePassword
 };

@@ -17,24 +17,25 @@ const {
   validateClientRegister,
 } = require("../middleware/validate");
 
-// Rate limiting for auth routes (stricter than general API)
-const authLimiter = rateLimit({
+// General API rate limiting (less restrictive)
+const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 requests per window
-  message: "تم تجاوز عدد محاولات الدخول المسموح بها، يرجى المحاولة لاحقاً",
+  max: 100, // 100 requests per window (much more generous for normal usage)
+  message: "تم تجاوز عدد الطلبات المسموح بها، يرجى المحاولة لاحقاً",
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-// General register route (optional, for backward compatibility)
-router.post("/register", authLimiter, validateRegister, register);
+// Apply general rate limiting to all auth routes
+router.use(apiLimiter);
 
-// Role-specific register routes
-router.post("/register/company", authLimiter, validateCompanyRegister, registerCompany);
-router.post("/register/engineer", authLimiter, validateEngineerRegister, registerEngineer);
-router.post("/register/client", authLimiter, validateClientRegister, registerClient);
+// Register routes (no additional rate limiting needed)
+router.post("/register", validateRegister, register);
+router.post("/register/company", validateCompanyRegister, registerCompany);
+router.post("/register/engineer", validateEngineerRegister, registerEngineer);
+router.post("/register/client", validateClientRegister, registerClient);
 
-// Login route
-router.post("/login", authLimiter, validateLogin, login);
+// Login route (uses specialized rate limiting in controller)
+router.post("/login", validateLogin, login);
 
 module.exports = router;

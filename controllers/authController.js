@@ -1,5 +1,18 @@
 const jwt = require("jsonwebtoken");
+const rateLimit = require("express-rate-limit");
 const User = require("../models/userModel");
+
+// Rate limiter for failed login attempts (based on IP)
+const failedLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 failed login requests per windowMs
+  message: {
+    message: "تم تجاوز عدد محاولات الدخول المسموح بها، يرجى المحاولة لاحقاً"
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true, // Only count failed requests
+});
 
 // Helper function to generate JWT token
 const generateToken = (userId, role) => {
@@ -11,6 +24,72 @@ const generateToken = (userId, role) => {
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || "1d" }
   );
+};
+
+// Login user
+const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Find user with password field
+    const user = await User.findOne({ email }).select("+password");
+    if (!user) {
+      // Apply rate limiting for failed attempts
+      return failedLoginLimiter(req, res, () => {
+        res.status(401).json({ message: "بيانات الدخول غير صحيحة" });
+      });
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
+      // Apply rate limiting for failed attempts
+      return failedLoginLimiter(req, res, () => {
+        res.status(403).json({ message: "الحساب غير مفعّل" });
+      });
+    }
+
+    // Compare password
+    const match = await user.comparePassword(password);
+    if (!match) {
+      // Apply rate limiting for failed attempts
+      return failedLoginLimiter(req, res, () => {
+        res.status(401).json({ message: "بيانات الدخول غير صحيحة" });
+      });
+    }
+
+    // Generate token
+    const token = generateToken(user._id, user.role);
+
+    // Update last login
+    user.lastLogin = new Date();
+    await user.save({ validateBeforeSave: false });
+
+    // Build user response based on role
+    const userResponse = {
+      id: user._id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    };
+
+    // Add role-specific fields
+    if (user.role === "company") {
+      userResponse.companyName = user.companyName;
+      userResponse.contactPersonName = user.contactPersonName;
+    } else if (user.role === "engineer") {
+      userResponse.licenseNumber = user.licenseNumber;
+      userResponse.specializations = user.specializations;
+    }
+
+    // Return user data (without password)
+    res.json({
+      message: "تم تسجيل الدخول بنجاح",
+      token,
+      user: userResponse,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
+  }
 };
 
 // Register new user
@@ -54,63 +133,6 @@ const register = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
     }
-    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
-  }
-};
-
-// Login user
-const login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // Find user with password field
-    const user = await User.findOne({ email }).select("+password");
-    if (!user) {
-      return res.status(401).json({ message: "بيانات الدخول غير صحيحة" });
-    }
-
-    // Check if user is active
-    if (!user.isActive) {
-      return res.status(403).json({ message: "الحساب غير مفعّل" });
-    }
-
-    // Compare password
-    const match = await user.comparePassword(password);
-    if (!match) {
-      return res.status(401).json({ message: "بيانات الدخول غير صحيحة" });
-    }
-
-    // Generate token
-    const token = generateToken(user._id, user.role);
-
-    // Update last login
-    user.lastLogin = new Date();
-    await user.save({ validateBeforeSave: false });
-
-    // Build user response based on role
-    const userResponse = {
-      id: user._id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-    };
-
-    // Add role-specific fields
-    if (user.role === "company") {
-      userResponse.companyName = user.companyName;
-      userResponse.contactPersonName = user.contactPersonName;
-    } else if (user.role === "engineer") {
-      userResponse.licenseNumber = user.licenseNumber;
-      userResponse.specializations = user.specializations;
-    }
-
-    // Return user data (without password)
-    res.json({
-      message: "تم تسجيل الدخول بنجاح",
-      token,
-      user: userResponse,
-    });
-  } catch (error) {
     res.status(500).json({ message: "خطأ في الخادم", error: error.message });
   }
 };

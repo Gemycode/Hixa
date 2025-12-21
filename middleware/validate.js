@@ -49,6 +49,9 @@ const validateLogin = (req, res, next) => {
     password: Joi.string().required().messages({
       "any.required": "كلمة المرور مطلوبة",
     }),
+    rememberMe: Joi.boolean().optional().messages({
+      "boolean.base": "قيمة تذكرني يجب أن تكون قيمة منطقية (true أو false)",
+    }),
   });
 
   const { error } = schema.validate(req.body, { abortEarly: false });

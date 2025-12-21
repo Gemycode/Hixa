@@ -17,24 +17,21 @@ const { protect, adminOnly } = require("../middleware/auth");
 const { validateUserCreate, validateUserUpdate, validateProfileUpdate, validatePasswordChange } = require("../middleware/validate");
 const { uploadSingle } = require("../middleware/upload");
 
-// Current user profile routes
-router.use(protect);
-router.get("/me", getProfile);
-router.put("/me", uploadSingle("avatar"), validateProfileUpdate, updateProfile);
-router.put("/me/change-password", validatePasswordChange, changePassword);
+// Current user profile routes (available to all authenticated users)
+router.get("/me", protect, getProfile);
+router.put("/me", protect, uploadSingle("avatar"), validateProfileUpdate, updateProfile);
+router.put("/me/change-password", protect, validatePasswordChange, changePassword);
 
 // Admin routes
-router.use(adminOnly);
+router.get("/", protect, adminOnly, getUsers);
+router.post("/", protect, adminOnly, validateUserCreate, createUser);
 
-router.get("/", getUsers);
-router.post("/", validateUserCreate, createUser);
-
-router.get("/:id", getUserById);
-router.put("/:id", validateUserUpdate, updateUser);
-router.delete("/:id", deleteUser);
+router.get("/:id", protect, adminOnly, getUserById);
+router.put("/:id", protect, adminOnly, validateUserUpdate, updateUser);
+router.delete("/:id", protect, adminOnly, deleteUser);
 
 // New admin routes
-router.post("/bulk-delete", bulkDeleteUsers);
-router.patch("/:id/toggle-activation", toggleUserActivation);
+router.post("/bulk-delete", protect, adminOnly, bulkDeleteUsers);
+router.patch("/:id/toggle-activation", protect, adminOnly, toggleUserActivation);
 
 module.exports = router;

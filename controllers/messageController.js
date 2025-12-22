@@ -27,14 +27,26 @@ const sendMessage = async (req, res) => {
     await chatRoom.save();
 
     // Update project room's last activity
+    const { getIO } = require("../socket");
+    
+    // Update project room's last activity
     const projectRoom = await ProjectRoom.findById(chatRoom.projectRoom);
     if (projectRoom) {
       projectRoom.lastActivityAt = message.createdAt;
       await projectRoom.save();
     }
+    
+    // Populate sender info before emitting
+    await message.populate("sender", "name email role avatar");
 
-    // Populate sender info before sending response
-    await message.populate("sender", "name email role");
+    // Emit real-time message
+    try {
+      const io = getIO();
+      io.to(chatRoomId).emit("new_message", message);
+      console.log(`Emitted new_message to room ${chatRoomId}`);
+    } catch (socketError) {
+      console.error("Socket emit failed:", socketError.message);
+    }
 
     res.status(201).json({
       message: "تم إرسال الرسالة بنجاح",

@@ -29,7 +29,7 @@ const register = async (req, res) => {
       email,
       password,
       name: name || email.split("@")[0],
-      role: role || "customer",
+      role: role && role !== "admin" ? role : "customer",
     });
 
     // Generate token

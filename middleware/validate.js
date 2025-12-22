@@ -28,7 +28,7 @@ const validateRegister = (req, res, next) => {
         "any.required": "كلمة المرور مطلوبة",
       }),
     name: Joi.string().trim().max(100).optional(),
-    role: Joi.string().valid("engineer", "client", "customer").optional(),
+    role: Joi.string().trim().lowercase().valid("engineer", "client", "customer").optional(),
   });
 
   const { error } = schema.validate(req.body, { abortEarly: false });

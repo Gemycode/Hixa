@@ -716,6 +716,97 @@ const validateProfileUpdate = (req, res, next) => {
   next();
 };
 
+// Password change validation
+const validatePasswordChange = (req, res, next) => {
+  const schema = Joi.object({
+    currentPassword: Joi.string().required().messages({
+      "any.required": "كلمة المرور الحالية مطلوبة",
+    }),
+    newPassword: Joi.string()
+      .min(8)
+      .pattern(passwordRegex)
+      .required()
+      .messages({
+        "string.min": "كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل",
+        "string.pattern.base":
+          "كلمة المرور الجديدة يجب أن تحتوي على حرف كبير، حرف صغير، ورقم واحد على الأقل",
+        "any.required": "كلمة المرور الجديدة مطلوبة",
+      }),
+    confirmNewPassword: Joi.string()
+      .valid(Joi.ref("newPassword"))
+      .required()
+      .messages({
+        "any.only": "تأكيد كلمة المرور غير متطابق",
+        "any.required": "تأكيد كلمة المرور الجديدة مطلوب",
+      }),
+  });
+
+  const { error } = schema.validate(req.body, { abortEarly: false });
+  if (error) {
+    const messages = error.details.map((detail) => detail.message).join(", ");
+    return res.status(400).json({ message: messages });
+  }
+  next();
+};
+
+// Chat Room validation
+const validateChatRoomCreate = (req, res, next) => {
+  const schema = Joi.object({
+    project: Joi.string().required().messages({
+      "any.required": "معرف المشروع مطلوب",
+    }),
+    projectRoom: Joi.string().required().messages({
+      "any.required": "معرف غرفة المشروع مطلوب",
+    }),
+    type: Joi.string().valid("admin-engineer", "admin-client", "group").required().messages({
+      "any.required": "نوع الغرفة مطلوب",
+      "any.only": "نوع الغرفة غير صحيح",
+    }),
+    engineer: Joi.string().when("type", {
+      is: "admin-engineer",
+      then: Joi.required(),
+      otherwise: Joi.optional(),
+    }).messages({
+      "any.required": "رقم المهندس مطلوب لنوع الغرفة هذا",
+    }),
+  });
+
+  const { error } = schema.validate(req.body, { abortEarly: false });
+  if (error) {
+    const messages = error.details.map((detail) => detail.message).join(", ");
+    return res.status(400).json({ message: messages });
+  }
+  next();
+};
+
+// Message validation
+const validateMessageCreate = (req, res, next) => {
+  const schema = Joi.object({
+    chatRoomId: Joi.string().required().messages({
+      "any.required": "معرف غرفة الدردشة مطلوب",
+    }),
+    content: Joi.string().max(5000).required().messages({
+      "any.required": "محتوى الرسالة مطلوب",
+      "string.max": "محتوى الرسالة يجب ألا يتجاوز 5000 حرف",
+    }),
+    type: Joi.string().valid("text", "file", "system").optional(),
+    attachments: Joi.array().items(
+      Joi.object({
+        name: Joi.string().optional(),
+        url: Joi.string().optional(),
+        type: Joi.string().optional(),
+      })
+    ).optional(),
+  });
+
+  const { error } = schema.validate(req.body, { abortEarly: false });
+  if (error) {
+    const messages = error.details.map((detail) => detail.message).join(", ");
+    return res.status(400).json({ message: messages });
+  }
+  next();
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -746,4 +837,7 @@ module.exports = {
   validateProposalCreate,
   validateProposalStatusUpdate,
   validateProposalUpdate,
+  validatePasswordChange,
+  validateChatRoomCreate,
+  validateMessageCreate,
 };

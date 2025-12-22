@@ -222,13 +222,124 @@ const updateUser = async (req, res, next) => {
 // Delete user
 const deleteUser = async (req, res, next) => {
   try {
-    const user = await User.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
+    
+    // Prevent users from deleting themselves
+    if (req.user.id === id) {
+      return res.status(400).json({ message: "لا يمكنك حذف حسابك الخاص" });
+    }
+
+    const user = await User.findByIdAndDelete(id);
     if (!user) {
       return res.status(404).json({ message: "المستخدم غير موجود" });
     }
+    
     res.json({ message: "تم حذف المستخدم بنجاح" });
   } catch (error) {
     next(error);
+  }
+};
+
+// Bulk delete users (admin only)
+const bulkDeleteUsers = async (req, res, next) => {
+  try {
+    const { ids } = req.body;
+    
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "يجب تقديم مصفوفة من معرفات المستخدمين" });
+    }
+    
+    // Prevent deleting oneself
+    if (ids.includes(req.user.id)) {
+      return res.status(400).json({ message: "لا يمكنك حذف حسابك الخاص" });
+    }
+    
+    const result = await User.deleteMany({ _id: { $in: ids } });
+    
+    res.json({ 
+      message: `تم حذف ${result.deletedCount} مستخدم بنجاح`,
+      deletedCount: result.deletedCount 
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Toggle user activation status (admin only)
+const toggleUserActivation = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    // Prevent users from toggling their own activation
+    if (req.user.id === id) {
+      return res.status(400).json({ message: "لا يمكنك تغيير حالة تفعيل حسابك الخاص" });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: "المستخدم غير موجود" });
+    }
+    
+    user.isActive = !user.isActive;
+    await user.save();
+    
+    res.json({
+      message: user.isActive 
+        ? "تم تفعيل المستخدم بنجاح" 
+        : "تم إلغاء تفعيل المستخدم بنجاح",
+      user: sanitizeUser(user)
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Change password for current user
+const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword, confirmNewPassword } = req.body;
+    const userId = req.user.id;
+
+    // Validate input
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      return res.status(400).json({ 
+        message: "جميع الحقول مطلوبة: كلمة المرور الحالية، كلمة المرور الجديدة، وتأكيد كلمة المرور الجديدة" 
+      });
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      return res.status(400).json({ 
+        message: "كلمة المرور الجديدة وتأكيد كلمة المرور غير متطابقين" 
+      });
+    }
+
+    // Get user with password
+    const user = await User.findById(userId).select("+password");
+    if (!user) {
+      return res.status(404).json({ message: "المستخدم غير موجود" });
+    }
+
+    // Check current password
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({ message: "كلمة المرور الحالية غير صحيحة" });
+    }
+
+    // Check if new password is different from current password
+    const isNewDifferent = !(await user.comparePassword(newPassword));
+    if (!isNewDifferent) {
+      return res.status(400).json({ 
+        message: "كلمة المرور الجديدة يجب أن تكون مختلفة عن كلمة المرور الحالية" 
+      });
+    }
+
+    // Update password
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: "تم تغيير كلمة المرور بنجاح" });
+  } catch (error) {
+    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
   }
 };
 
@@ -240,5 +351,8 @@ module.exports = {
   deleteUser,
   getProfile,
   updateProfile,
+  bulkDeleteUsers,
+  toggleUserActivation,
+  changePassword
 };
 

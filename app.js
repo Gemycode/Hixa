@@ -19,6 +19,10 @@ const projectRoutes = require("./routes/projectRoutes");
 const portfolioRoutes = require("./routes/portfolioRoutes");
 const serviceOrderRoutes = require("./routes/serviceOrderRoutes");
 const proposalRoutes = require("./routes/proposalRoutes");
+// Chat system routes
+const projectRoomRoutes = require("./routes/projectRoomRoutes");
+const chatRoomRoutes = require("./routes/chatRoomRoutes");
+const messageRoutes = require("./routes/messageRoutes");
 
 const app = express();
 
@@ -101,6 +105,10 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/portfolio", portfolioRoutes);
 app.use("/api/service-orders", serviceOrderRoutes);
 app.use("/api/proposals", proposalRoutes);
+// Chat system routes
+app.use("/api/project-rooms", projectRoomRoutes);
+app.use("/api/chat-rooms", chatRoomRoutes);
+app.use("/api/messages", messageRoutes);
 
 // 404 handler (route not found)
 app.use((req, res) => {

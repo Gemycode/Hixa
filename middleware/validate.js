@@ -5,7 +5,7 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Password validation: at least 8 chars, 1 uppercase, 1 lowercase, 1 number
 const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$/;
-const roles = ["admin", "engineer", "client", "company"];
+const roles = ["admin", "engineer", "client", "customer"];
 
 // Register validation
 const validateRegister = (req, res, next) => {
@@ -48,9 +48,6 @@ const validateLogin = (req, res, next) => {
     }),
     password: Joi.string().required().messages({
       "any.required": "كلمة المرور مطلوبة",
-    }),
-    rememberMe: Joi.boolean().optional().messages({
-      "boolean.base": "قيمة تذكرني يجب أن تكون قيمة منطقية (true أو false)",
     }),
   });
 
@@ -692,11 +689,6 @@ const validateProfileUpdate = (req, res, next) => {
     phone: Joi.string().trim().max(50),
     location: Joi.string().trim().max(200),
     bio: Joi.string().trim().max(1000),
-    // Company-specific fields
-    companyName: Joi.string().trim().max(200),
-    contactPersonName: Joi.string().trim().max(200),
-    // Engineer-specific fields
-    licenseNumber: Joi.string().trim().max(50),
     specializations: Joi.alternatives().try(
       Joi.array().items(Joi.string().trim().max(100)),
       Joi.string() // will be parsed in controller (JSON / comma / newline)
@@ -724,210 +716,9 @@ const validateProfileUpdate = (req, res, next) => {
   next();
 };
 
-// Company Registration Validation
-const validateCompanyRegister = (req, res, next) => {
-  const schema = Joi.object({
-    companyName: Joi.string()
-      .trim()
-      .max(200)
-      .required()
-      .messages({
-        "string.empty": "اسم الشركة مطلوب",
-        "any.required": "اسم الشركة مطلوب",
-        "string.max": "اسم الشركة يجب ألا يتجاوز 200 حرف",
-      }),
-    contactPersonName: Joi.string()
-      .trim()
-      .max(200)
-      .required()
-      .messages({
-        "string.empty": "اسم الشخص المسؤول مطلوب",
-        "any.required": "اسم الشخص المسؤول مطلوب",
-        "string.max": "اسم الشخص المسؤول يجب ألا يتجاوز 200 حرف",
-      }),
-    email: Joi.string()
-      .email({ tlds: { allow: false } })
-      .required()
-      .messages({
-        "string.email": "البريد الإلكتروني غير صحيح",
-        "any.required": "البريد الإلكتروني مطلوب",
-      }),
-    password: Joi.string()
-      .min(8)
-      .pattern(passwordRegex)
-      .required()
-      .messages({
-        "string.min": "كلمة المرور يجب أن تكون 8 أحرف على الأقل",
-        "string.pattern.base":
-          "كلمة المرور يجب أن تحتوي على حرف كبير، حرف صغير، ورقم واحد على الأقل",
-        "any.required": "كلمة المرور مطلوبة",
-      }),
-    confirmPassword: Joi.string()
-      .valid(Joi.ref("password"))
-      .required()
-      .messages({
-        "any.only": "كلمة المرور غير متطابقة",
-        "any.required": "تأكيد كلمة المرور مطلوب",
-      }),
-  });
-
-  const { error } = schema.validate(req.body, { abortEarly: false });
-  if (error) {
-    const messages = error.details.map((detail) => detail.message).join(", ");
-    return res.status(400).json({ message: messages });
-  }
-  next();
-};
-
-// Engineer Registration Validation
-const validateEngineerRegister = (req, res, next) => {
-  const schema = Joi.object({
-    fullName: Joi.string()
-      .trim()
-      .max(200)
-      .required()
-      .messages({
-        "string.empty": "الاسم الكامل مطلوب",
-        "any.required": "الاسم الكامل مطلوب",
-        "string.max": "الاسم الكامل يجب ألا يتجاوز 200 حرف",
-      }),
-    specialization: Joi.string()
-      .trim()
-      .max(500)
-      .required()
-      .messages({
-        "string.empty": "التخصص مطلوب",
-        "any.required": "التخصص مطلوب",
-        "string.max": "التخصص يجب ألا يتجاوز 500 حرف",
-      }),
-    licenseNumber: Joi.string()
-      .trim()
-      .max(50)
-      .required()
-      .messages({
-        "string.empty": "رقم الرخصة المهنية مطلوب",
-        "any.required": "رقم الرخصة المهنية مطلوب",
-        "string.max": "رقم الرخصة يجب ألا يتجاوز 50 حرف",
-      }),
-    email: Joi.string()
-      .email({ tlds: { allow: false } })
-      .required()
-      .messages({
-        "string.email": "البريد الإلكتروني غير صحيح",
-        "any.required": "البريد الإلكتروني مطلوب",
-      }),
-    password: Joi.string()
-      .min(8)
-      .pattern(passwordRegex)
-      .required()
-      .messages({
-        "string.min": "كلمة المرور يجب أن تكون 8 أحرف على الأقل",
-        "string.pattern.base":
-          "كلمة المرور يجب أن تحتوي على حرف كبير، حرف صغير، ورقم واحد على الأقل",
-        "any.required": "كلمة المرور مطلوبة",
-      }),
-    confirmPassword: Joi.string()
-      .valid(Joi.ref("password"))
-      .required()
-      .messages({
-        "any.only": "كلمة المرور غير متطابقة",
-        "any.required": "تأكيد كلمة المرور مطلوب",
-      }),
-  });
-
-  const { error } = schema.validate(req.body, { abortEarly: false });
-  if (error) {
-    const messages = error.details.map((detail) => detail.message).join(", ");
-    return res.status(400).json({ message: messages });
-  }
-  next();
-};
-
-// Client Registration Validation
-const validateClientRegister = (req, res, next) => {
-  const schema = Joi.object({
-    fullName: Joi.string()
-      .trim()
-      .max(200)
-      .required()
-      .messages({
-        "string.empty": "الاسم الكامل مطلوب",
-        "any.required": "الاسم الكامل مطلوب",
-        "string.max": "الاسم الكامل يجب ألا يتجاوز 200 حرف",
-      }),
-    email: Joi.string()
-      .email({ tlds: { allow: false } })
-      .required()
-      .messages({
-        "string.email": "البريد الإلكتروني غير صحيح",
-        "any.required": "البريد الإلكتروني مطلوب",
-      }),
-    password: Joi.string()
-      .min(8)
-      .pattern(passwordRegex)
-      .required()
-      .messages({
-        "string.min": "كلمة المرور يجب أن تكون 8 أحرف على الأقل",
-        "string.pattern.base":
-          "كلمة المرور يجب أن تحتوي على حرف كبير، حرف صغير، ورقم واحد على الأقل",
-        "any.required": "كلمة المرور مطلوبة",
-      }),
-    confirmPassword: Joi.string()
-      .valid(Joi.ref("password"))
-      .required()
-      .messages({
-        "any.only": "كلمة المرور غير متطابقة",
-        "any.required": "تأكيد كلمة المرور مطلوب",
-      }),
-  });
-
-  const { error } = schema.validate(req.body, { abortEarly: false });
-  if (error) {
-    const messages = error.details.map((detail) => detail.message).join(", ");
-    return res.status(400).json({ message: messages });
-  }
-  next();
-};
-
-// Password change validation
-const validatePasswordChange = (req, res, next) => {
-  const schema = Joi.object({
-    currentPassword: Joi.string().required().messages({
-      "any.required": "كلمة المرور الحالية مطلوبة",
-    }),
-    newPassword: Joi.string()
-      .min(8)
-      .pattern(passwordRegex)
-      .required()
-      .messages({
-        "string.min": "كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل",
-        "string.pattern.base":
-          "كلمة المرور الجديدة يجب أن تحتوي على حرف كبير، حرف صغير، ورقم واحد على الأقل",
-        "any.required": "كلمة المرور الجديدة مطلوبة",
-      }),
-    confirmNewPassword: Joi.string()
-      .valid(Joi.ref("newPassword"))
-      .required()
-      .messages({
-        "any.only": "تأكيد كلمة المرور غير متطابق",
-        "any.required": "تأكيد كلمة المرور الجديدة مطلوب",
-      }),
-  });
-
-  const { error } = schema.validate(req.body, { abortEarly: false });
-  if (error) {
-    const messages = error.details.map((detail) => detail.message).join(", ");
-    return res.status(400).json({ message: messages });
-  }
-  next();
-};
-
 module.exports = {
   validateRegister,
   validateLogin,
-  validateCompanyRegister,
-  validateEngineerRegister,
-  validateClientRegister,
   validateHero,
   validateAbout,
   validateService,
@@ -955,5 +746,4 @@ module.exports = {
   validateProposalCreate,
   validateProposalStatusUpdate,
   validateProposalUpdate,
-  validatePasswordChange,
 };

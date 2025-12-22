@@ -1,5 +1,7 @@
 const Proposal = require("../models/proposalModel");
 const Project = require("../models/projectModel");
+const ProjectRoom = require("../models/projectRoomModel");
+const ChatRoom = require("../models/chatRoomModel");
 
 // Format proposal for responses
 const sanitizeProposal = (proposal) => {
@@ -49,6 +51,76 @@ exports.createProposal = async (req, res, next) => {
 
     // Increment project's proposals count (soft fail)
     await Project.updateOne({ _id: projectId }, { $inc: { proposalsCount: 1 } }).catch(() => {});
+
+    // Automatically create ProjectRoom and ChatRooms when first proposal is submitted
+    try {
+      // Check if ProjectRoom already exists
+      let projectRoom = await ProjectRoom.findOne({ project: projectId });
+      
+      if (!projectRoom) {
+        // Create ProjectRoom
+        projectRoom = await ProjectRoom.create({
+          project: projectId,
+          projectTitle: project.title,
+        });
+      }
+
+      // Check if ChatRoom between Admin and Engineer already exists
+      let adminEngineerChatRoom = await ChatRoom.findOne({
+        project: projectId,
+        projectRoom: projectRoom._id,
+        type: "admin-engineer",
+        engineer: req.user._id,
+      });
+
+      if (!adminEngineerChatRoom) {
+        // Create ChatRoom for Admin-Engineer communication
+        adminEngineerChatRoom = await ChatRoom.create({
+          project: projectId,
+          projectRoom: projectRoom._id,
+          type: "admin-engineer",
+          engineer: req.user._id,
+          participants: [
+            {
+              user: req.user._id,
+              role: "engineer",
+              joinedAt: new Date(),
+            },
+            // Admin will be added when they join the chat
+          ],
+        });
+      }
+
+      // Check if ChatRoom between Admin and Client already exists
+      let adminClientChatRoom = await ChatRoom.findOne({
+        project: projectId,
+        projectRoom: projectRoom._id,
+        type: "admin-client",
+      });
+
+      if (!adminClientChatRoom) {
+        // Create ChatRoom for Admin-Client communication
+        adminClientChatRoom = await ChatRoom.create({
+          project: projectId,
+          projectRoom: projectRoom._id,
+          type: "admin-client",
+          participants: [
+            {
+              user: project.client,
+              role: "client",
+              joinedAt: new Date(),
+            },
+            // Admin will be added when they join the chat
+          ],
+        });
+      }
+
+      // Send system message in Admin-Engineer ChatRoom
+      // Note: In a complete implementation, you would also create a Message here
+    } catch (chatError) {
+      // Log error but don't fail the proposal creation
+      console.error("Error creating chat rooms:", chatError);
+    }
 
     res.status(201).json({
       message: "تم إرسال العرض بنجاح",

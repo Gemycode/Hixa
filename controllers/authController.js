@@ -1,19 +1,5 @@
 const jwt = require("jsonwebtoken");
-const rateLimit = require("express-rate-limit");
-const crypto = require("crypto");
 const User = require("../models/userModel");
-
-// Rate limiter for failed login attempts (based on IP)
-const failedLoginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 failed login requests per windowMs
-  message: {
-    message: "تم تجاوز عدد محاولات الدخول المسموح بها، يرجى المحاولة لاحقاً"
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  skipSuccessfulRequests: true, // Only count failed requests
-});
 
 // Helper function to generate JWT token
 const generateToken = (userId, role) => {
@@ -25,146 +11,6 @@ const generateToken = (userId, role) => {
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || "1d" }
   );
-};
-
-// Helper function to generate Remember Me token
-const generateRememberToken = () => {
-  return crypto.randomBytes(40).toString('hex');
-};
-
-// Login user
-const login = async (req, res) => {
-  try {
-    const { email, password, rememberMe } = req.body;
-
-    // Find user with password field
-    const user = await User.findOne({ email }).select("+password");
-    if (!user) {
-      // Apply rate limiting for failed attempts
-      return failedLoginLimiter(req, res, () => {
-        res.status(401).json({ message: "بيانات الدخول غير صحيحة" });
-      });
-    }
-
-    // Check if user is active
-    if (!user.isActive) {
-      // Apply rate limiting for failed attempts
-      return failedLoginLimiter(req, res, () => {
-        res.status(403).json({ message: "الحساب غير مفعّل" });
-      });
-    }
-
-    // Compare password
-    const match = await user.comparePassword(password);
-    if (!match) {
-      // Apply rate limiting for failed attempts
-      return failedLoginLimiter(req, res, () => {
-        res.status(401).json({ message: "بيانات الدخول غير صحيحة" });
-      });
-    }
-
-    // Generate token
-    const token = generateToken(user._id, user.role);
-
-    let refreshToken = null;
-    
-    // Handle Remember Me functionality
-    if (rememberMe) {
-      refreshToken = generateRememberToken();
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 30); // 30 days expiration
-      
-      // Add remember token to user
-      user.rememberTokens.push({
-        token: refreshToken,
-        expiresAt: expiresAt,
-        userAgent: req.get('User-Agent'),
-        ipAddress: req.ip,
-      });
-      
-      await user.save({ validateBeforeSave: false });
-    }
-
-    // Update last login
-    user.lastLogin = new Date();
-    await user.save({ validateBeforeSave: false });
-
-    // Build user response based on role
-    const userResponse = {
-      id: user._id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-    };
-
-    // Add role-specific fields
-    if (user.role === "company") {
-      userResponse.companyName = user.companyName;
-      userResponse.contactPersonName = user.contactPersonName;
-    } else if (user.role === "engineer") {
-      userResponse.licenseNumber = user.licenseNumber;
-      userResponse.specializations = user.specializations;
-    }
-
-    // Return user data (without password)
-    res.json({
-      message: "تم تسجيل الدخول بنجاح",
-      token,
-      refreshToken: rememberMe ? refreshToken : undefined,
-      user: userResponse,
-    });
-  } catch (error) {
-    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
-  }
-};
-
-// Change password
-const changePassword = async (req, res) => {
-  try {
-    const { currentPassword, newPassword, confirmNewPassword } = req.body;
-    const userId = req.user.id;
-
-    // Validate input
-    if (!currentPassword || !newPassword || !confirmNewPassword) {
-      return res.status(400).json({ 
-        message: "جميع الحقول مطلوبة: كلمة المرور الحالية، كلمة المرور الجديدة، وتأكيد كلمة المرور الجديدة" 
-      });
-    }
-
-    if (newPassword !== confirmNewPassword) {
-      return res.status(400).json({ 
-        message: "كلمة المرور الجديدة وتأكيد كلمة المرور غير متطابقين" 
-      });
-    }
-
-    // Get user with password
-    const user = await User.findById(userId).select("+password");
-    if (!user) {
-      return res.status(404).json({ message: "المستخدم غير موجود" });
-    }
-
-    // Check current password
-    const isMatch = await user.comparePassword(currentPassword);
-    if (!isMatch) {
-      return res.status(400).json({ message: "كلمة المرور الحالية غير صحيحة" });
-    }
-
-    // Check if new password is different from current password
-    const isNewDifferent = !(await user.comparePassword(newPassword));
-    if (!isNewDifferent) {
-      return res.status(400).json({ 
-        message: "كلمة المرور الجديدة يجب أن تكون مختلفة عن كلمة المرور الحالية" 
-      });
-    }
-
-    // Update password
-    user.password = newPassword;
-    await user.save();
-
-    res.json({ message: "تم تغيير كلمة المرور بنجاح" });
-  } catch (error) {
-    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
-  }
 };
 
 // Register new user
@@ -183,7 +29,7 @@ const register = async (req, res) => {
       email,
       password,
       name: name || email.split("@")[0],
-      role: role || "client",
+      role: role || "customer",
     });
 
     // Generate token
@@ -212,157 +58,38 @@ const register = async (req, res) => {
   }
 };
 
-// Register Company
-const registerCompany = async (req, res) => {
+// Login user
+const login = async (req, res) => {
   try {
-    const { companyName, contactPersonName, email, password } = req.body;
+    const { email, password } = req.body;
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
+    // Find user with password field
+    const user = await User.findOne({ email }).select("+password");
+    if (!user) {
+      return res.status(401).json({ message: "بيانات الدخول غير صحيحة" });
     }
 
-    // Create new company user
-    const user = await User.create({
-      email,
-      password,
-      name: contactPersonName,
-      role: "company",
-      companyName,
-      contactPersonName,
-    });
+    // Check if user is active
+    if (!user.isActive) {
+      return res.status(403).json({ message: "الحساب غير مفعّل" });
+    }
+
+    // Compare password
+    const match = await user.comparePassword(password);
+    if (!match) {
+      return res.status(401).json({ message: "بيانات الدخول غير صحيحة" });
+    }
 
     // Generate token
     const token = generateToken(user._id, user.role);
 
     // Update last login
     user.lastLogin = new Date();
-    await user.save();
+    await user.save({ validateBeforeSave: false });
 
     // Return user data (without password)
-    res.status(201).json({
-      message: "تم تسجيل الشركة بنجاح",
-      token,
-      user: {
-        id: user._id,
-        email: user.email,
-        name: user.name,
-        companyName: user.companyName,
-        contactPersonName: user.contactPersonName,
-        role: user.role,
-      },
-    });
-  } catch (error) {
-    if (error.code === 11000) {
-      return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
-    }
-    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
-  }
-};
-
-// Register Engineer
-const registerEngineer = async (req, res) => {
-  try {
-    const { fullName, specialization, licenseNumber, email, password } = req.body;
-
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
-    }
-
-    // Check if license number already exists
-    const existingLicense = await User.findOne({ licenseNumber });
-    if (existingLicense) {
-      return res.status(409).json({ message: "رقم الرخصة المهنية مستخدم بالفعل" });
-    }
-
-    // Parse specializations (can be comma-separated string or array)
-    let specializationsArray = [];
-    if (specialization) {
-      if (typeof specialization === "string") {
-        specializationsArray = specialization
-          .split(",")
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0);
-      } else if (Array.isArray(specialization)) {
-        specializationsArray = specialization;
-      }
-    }
-
-    // Create new engineer user
-    const user = await User.create({
-      email,
-      password,
-      name: fullName,
-      role: "engineer",
-      licenseNumber,
-      specializations: specializationsArray,
-    });
-
-    // Generate token
-    const token = generateToken(user._id, user.role);
-
-    // Update last login
-    user.lastLogin = new Date();
-    await user.save();
-
-    // Return user data (without password)
-    res.status(201).json({
-      message: "تم تسجيل المهندس بنجاح",
-      token,
-      user: {
-        id: user._id,
-        email: user.email,
-        name: user.name,
-        licenseNumber: user.licenseNumber,
-        specializations: user.specializations,
-        role: user.role,
-      },
-    });
-  } catch (error) {
-    if (error.code === 11000) {
-      if (error.keyPattern?.email) {
-        return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
-      }
-      if (error.keyPattern?.licenseNumber) {
-        return res.status(409).json({ message: "رقم الرخصة المهنية مستخدم بالفعل" });
-      }
-    }
-    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
-  }
-};
-
-// Register Client
-const registerClient = async (req, res) => {
-  try {
-    const { fullName, email, password } = req.body;
-
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
-    }
-
-    // Create new client user
-    const user = await User.create({
-      email,
-      password,
-      name: fullName,
-      role: "client",
-    });
-
-    // Generate token
-    const token = generateToken(user._id, user.role);
-
-    // Update last login
-    user.lastLogin = new Date();
-    await user.save();
-
-    // Return user data (without password)
-    res.status(201).json({
-      message: "تم تسجيل العميل بنجاح",
+    res.json({
+      message: "تم تسجيل الدخول بنجاح",
       token,
       user: {
         id: user._id,
@@ -372,11 +99,8 @@ const registerClient = async (req, res) => {
       },
     });
   } catch (error) {
-    if (error.code === 11000) {
-      return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
-    }
     res.status(500).json({ message: "خطأ في الخادم", error: error.message });
   }
 };
 
-module.exports = { register, login, registerCompany, registerEngineer, registerClient, changePassword };
+module.exports = { register, login };

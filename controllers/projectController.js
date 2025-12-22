@@ -1,4 +1,6 @@
 const Project = require("../models/projectModel");
+const ProjectRoom = require("../models/projectRoomModel");
+const ChatRoom = require("../models/chatRoomModel");
 const { uploadToCloudinary, uploadFileToCloudinary, deleteFromCloudinary } = require("../middleware/upload");
 
 // Helper to sanitize project data for response
@@ -187,6 +189,7 @@ exports.updateProject = async (req, res, next) => {
       deadline,
       tags,
       status,
+      assignedEngineer, // Add this
     } = req.body;
 
     const project = await Project.findById(id);
@@ -194,6 +197,9 @@ exports.updateProject = async (req, res, next) => {
     if (!project) {
       return res.status(404).json({ message: "المشروع غير موجود" });
     }
+
+    // Store original assignedEngineer for comparison
+    const originalAssignedEngineer = project.assignedEngineer;
 
     // Check permissions
     if (req.user.role === "client" && project.client.toString() !== req.user._id.toString()) {
@@ -204,6 +210,10 @@ exports.updateProject = async (req, res, next) => {
     if (req.user.role === "client") {
       if (status && !["Draft", "Pending Review", "Waiting for Engineers"].includes(status)) {
         return res.status(403).json({ message: "لا يمكنك تغيير الحالة إلى هذه القيمة" });
+      }
+      // Clients can't assign engineers
+      if (assignedEngineer !== undefined) {
+        return res.status(403).json({ message: "لا يمكنك تعيين مهندس لهذا المشروع" });
       }
     }
 
@@ -222,8 +232,93 @@ exports.updateProject = async (req, res, next) => {
     } else if (status !== undefined && ["Draft", "Pending Review", "Waiting for Engineers"].includes(status)) {
       project.status = status;
     }
+    
+    // Admins can assign engineers
+    if (assignedEngineer !== undefined && req.user.role === "admin") {
+      project.assignedEngineer = assignedEngineer;
+    }
 
     await project.save();
+
+    // If engineer was assigned, create group chat room
+    if (req.user.role === "admin" && 
+        assignedEngineer && 
+        originalAssignedEngineer?.toString() !== assignedEngineer.toString()) {
+      
+      try {
+        // Get or create ProjectRoom
+        let projectRoom = await ProjectRoom.findOne({ project: id });
+        
+        if (!projectRoom) {
+          projectRoom = await ProjectRoom.create({
+            project: id,
+            projectTitle: project.title,
+          });
+        }
+
+        // Check if Group ChatRoom already exists
+        let groupChatRoom = await ChatRoom.findOne({
+          project: id,
+          projectRoom: projectRoom._id,
+          type: "group",
+        });
+
+        if (!groupChatRoom) {
+          // Create Group ChatRoom
+          groupChatRoom = await ChatRoom.create({
+            project: id,
+            projectRoom: projectRoom._id,
+            type: "group",
+            participants: [
+              {
+                user: project.client,
+                role: "client",
+                joinedAt: new Date(),
+              },
+              {
+                user: assignedEngineer,
+                role: "engineer",
+                joinedAt: new Date(),
+              },
+              // Admin will be added when they join the chat
+            ],
+          });
+
+          // Send system message about hiring
+          // Note: In a complete implementation, you would also create a Message here
+        } else {
+          // Add participants if they don't exist
+          const clientExists = groupChatRoom.participants.some(
+            p => p.user.toString() === project.client.toString()
+          );
+          
+          const engineerExists = groupChatRoom.participants.some(
+            p => p.user.toString() === assignedEngineer.toString()
+          );
+
+          if (!clientExists) {
+            groupChatRoom.participants.push({
+              user: project.client,
+              role: "client",
+              joinedAt: new Date(),
+            });
+          }
+
+          if (!engineerExists) {
+            groupChatRoom.participants.push({
+              user: assignedEngineer,
+              role: "engineer",
+              joinedAt: new Date(),
+            });
+          }
+
+          await groupChatRoom.save();
+        }
+      } catch (chatError) {
+        // Log error but don't fail the project update
+        console.error("Error creating group chat room:", chatError);
+      }
+    }
 
     res.json({
       message: "تم تحديث المشروع بنجاح",

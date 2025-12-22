@@ -1,6 +1,7 @@
 const Project = require("../models/projectModel");
 const ProjectRoom = require("../models/projectRoomModel");
 const ChatRoom = require("../models/chatRoomModel");
+const Message = require("../models/messageModel");
 const { uploadToCloudinary, uploadFileToCloudinary, deleteFromCloudinary } = require("../middleware/upload");
 
 // Helper to sanitize project data for response
@@ -285,7 +286,24 @@ exports.updateProject = async (req, res, next) => {
           });
 
           // Send system message about hiring
-          // Note: In a complete implementation, you would also create a Message here
+          const systemMessage = await Message.create({
+            chatRoom: groupChatRoom._id,
+            sender: "system",
+            content: `تم توظيف المهندس ${req.user.name || 'مجهول'} للمشروع "${project.title}". يمكنكم الآن التواصل مباشرة.`,
+            type: "system",
+          });
+          
+          // Update chat room's last message
+          groupChatRoom.lastMessage = {
+            content: systemMessage.content.substring(0, 100),
+            sender: "system",
+            createdAt: systemMessage.createdAt,
+          };
+          await groupChatRoom.save();
+          
+          // Update project room's last activity
+          projectRoom.lastActivityAt = systemMessage.createdAt;
+          await projectRoom.save();
         } else {
           // Add participants if they don't exist
           const clientExists = groupChatRoom.participants.some(
@@ -296,12 +314,15 @@ exports.updateProject = async (req, res, next) => {
             p => p.user.toString() === assignedEngineer.toString()
           );
 
+          let updated = false;
+          
           if (!clientExists) {
             groupChatRoom.participants.push({
               user: project.client,
               role: "client",
               joinedAt: new Date(),
             });
+            updated = true;
           }
 
           if (!engineerExists) {
@@ -310,9 +331,32 @@ exports.updateProject = async (req, res, next) => {
               role: "engineer",
               joinedAt: new Date(),
             });
+            updated = true;
           }
 
-          await groupChatRoom.save();
+          if (updated) {
+            await groupChatRoom.save();
+            
+            // Send system message about adding participants
+            const systemMessage = await Message.create({
+              chatRoom: groupChatRoom._id,
+              sender: "system",
+              content: `تم تحديث المشاركين في مجموعة المشروع "${project.title}".`,
+              type: "system",
+            });
+            
+            // Update chat room's last message
+            groupChatRoom.lastMessage = {
+              content: systemMessage.content.substring(0, 100),
+              sender: "system",
+              createdAt: systemMessage.createdAt,
+            };
+            await groupChatRoom.save();
+            
+            // Update project room's last activity
+            projectRoom.lastActivityAt = systemMessage.createdAt;
+            await projectRoom.save();
+          }
         }
       } catch (chatError) {
         // Log error but don't fail the project update

@@ -63,3 +63,13 @@ async function testProjectRoom() {
 }
 
 testProjectRoom();
+
+// Simple test to verify models are working
+console.log('Chat system models loaded successfully!');
+
+// Export for testing
+module.exports = {
+  ProjectRoom,
+  ChatRoom,
+  Message
+};

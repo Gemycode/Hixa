@@ -2,6 +2,7 @@ const Proposal = require("../models/proposalModel");
 const Project = require("../models/projectModel");
 const ProjectRoom = require("../models/projectRoomModel");
 const ChatRoom = require("../models/chatRoomModel");
+const Message = require("../models/messageModel");
 
 // Format proposal for responses
 const sanitizeProposal = (proposal) => {
@@ -63,6 +64,8 @@ exports.createProposal = async (req, res, next) => {
           project: projectId,
           projectTitle: project.title,
         });
+        
+        console.log(`Created ProjectRoom for project ${projectId}`);
       }
 
       // Check if ChatRoom between Admin and Engineer already exists
@@ -89,6 +92,8 @@ exports.createProposal = async (req, res, next) => {
             // Admin will be added when they join the chat
           ],
         });
+        
+        console.log(`Created Admin-Engineer ChatRoom for project ${projectId}`);
       }
 
       // Check if ChatRoom between Admin and Client already exists
@@ -113,10 +118,46 @@ exports.createProposal = async (req, res, next) => {
             // Admin will be added when they join the chat
           ],
         });
+        
+        console.log(`Created Admin-Client ChatRoom for project ${projectId}`);
+        
+        // Send system message in Admin-Client ChatRoom
+        const systemMessageClient = await Message.create({
+          chatRoom: adminClientChatRoom._id,
+          sender: "system",
+          content: `قام المهندس ${req.user.name || 'مجهول'} بتقديم عرض على مشروعك "${project.title}". سيتم التواصل معك قريباً.`,
+          type: "system",
+        });
+        
+        // Update chat room's last message
+        adminClientChatRoom.lastMessage = {
+          content: systemMessageClient.content.substring(0, 100),
+          sender: "system",
+          createdAt: systemMessageClient.createdAt,
+        };
+        await adminClientChatRoom.save();
       }
 
       // Send system message in Admin-Engineer ChatRoom
-      // Note: In a complete implementation, you would also create a Message here
+      const systemMessageEngineer = await Message.create({
+        chatRoom: adminEngineerChatRoom._id,
+        sender: "system",
+        content: `قام المهندس ${req.user.name || 'مجهول'} بتقديم عرض على المشروع "${project.title}". يرجى التواصل معه لإجراء مقابلة.`,
+        type: "system",
+      });
+      
+      // Update chat room's last message
+      adminEngineerChatRoom.lastMessage = {
+        content: systemMessageEngineer.content.substring(0, 100),
+        sender: "system",
+        createdAt: systemMessageEngineer.createdAt,
+      };
+      await adminEngineerChatRoom.save();
+      
+      // Update project room's last activity
+      projectRoom.lastActivityAt = systemMessageEngineer.createdAt;
+      await projectRoom.save();
+      
     } catch (chatError) {
       // Log error but don't fail the proposal creation
       console.error("Error creating chat rooms:", chatError);

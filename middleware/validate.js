@@ -1,43 +1,84 @@
-const Joi = require("joi");
+const { body, param, query, validationResult } = require('express-validator');
+const { StatusCodes } = require('http-status-codes');
+const { BadRequestError } = require('../utils/errors');
 
-// Email validation regex
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Reusable validation rules
+const commonRules = {
+  email: {
+    isEmail: {
+      errorMessage: 'البريد الإلكتروني غير صحيح',
+    },
+    normalizeEmail: true,
+  },
+  password: {
+    isStrongPassword: {
+      errorMessage: 'يجب أن تحتوي كلمة المرور على 8 أحرف على الأقل، حرف كبير، حرف صغير، ورقم واحد على الأقل',
+      options: {
+        minLength: 8,
+        minLowercase: 1,
+        minUppercase: 1,
+        minNumbers: 1,
+        minSymbols: 0,
+      },
+    },
+  },
+  objectId: {
+    isMongoId: {
+      errorMessage: 'معرف غير صالح',
+    },
+  },
+};
 
-// Password validation: at least 8 chars, 1 uppercase, 1 lowercase, 1 number
-const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$/;
-const roles = ["admin", "engineer", "client", "customer"];
+// Common validation middleware
+const validate = (validations) => {
+  return async (req, res, next) => {
+    await Promise.all(validations.map(validation => validation.run(req)));
+
+    const errors = validationResult(req);
+    if (errors.isEmpty()) {
+      return next();
+    }
+
+    const extractedErrors = [];
+    errors.array().map(err => extractedErrors.push({ [err.param]: err.msg }));
+
+    throw new BadRequestError('بيانات غير صالحة', {
+      errors: extractedErrors,
+    });
+  };
+};
 
 // Register validation
-const validateRegister = (req, res, next) => {
-  const schema = Joi.object({
-    email: Joi.string()
-      .email({ tlds: { allow: false } })
-      .required()
-      .messages({
-        "string.email": "البريد الإلكتروني غير صحيح",
-        "any.required": "البريد الإلكتروني مطلوب",
-      }),
-    password: Joi.string()
-      .min(8)
-      .pattern(passwordRegex)
-      .required()
-      .messages({
-        "string.min": "كلمة المرور يجب أن تكون 8 أحرف على الأقل",
-        "string.pattern.base":
-          "كلمة المرور يجب أن تحتوي على حرف كبير، حرف صغير، ورقم واحد على الأقل",
-        "any.required": "كلمة المرور مطلوبة",
-      }),
-    name: Joi.string().trim().max(100).optional(),
-    role: Joi.string().trim().lowercase().valid("engineer", "client", "customer").optional(),
-  });
+const registerRules = [
+  body('email')
+    .notEmpty().withMessage('البريد الإلكتروني مطلوب')
+    .isEmail().withMessage('البريد الإلكتروني غير صحيح')
+    .normalizeEmail(),
+  
+  body('password')
+    .notEmpty().withMessage('كلمة المرور مطلوبة')
+    .isStrongPassword({
+      minLength: 8,
+      minLowercase: 1,
+      minUppercase: 1,
+      minNumbers: 1,
+      minSymbols: 0,
+    })
+    .withMessage('يجب أن تحتوي كلمة المرور على 8 أحرف على الأقل، حرف كبير، حرف صغير، ورقم واحد على الأقل'),
+  
+  body('name')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('يجب ألا يتجاوز الاسم 100 حرف'),
+    
+  body('role')
+    .optional()
+    .isIn(['engineer', 'client', 'customer'])
+    .withMessage('الدور المحدد غير صالح'),
+];
 
-  const { error } = schema.validate(req.body, { abortEarly: false });
-  if (error) {
-    const messages = error.details.map((detail) => detail.message).join(", ");
-    return res.status(400).json({ message: messages });
-  }
-  next();
-};
+const validateRegister = validate(registerRules);
 
 // Login validation
 const validateLogin = (req, res, next) => {
@@ -807,37 +848,148 @@ const validateMessageCreate = (req, res, next) => {
   next();
 };
 
+// Message validation rules
+const messageRules = {
+  create: [
+    body('chatRoomId')
+      .notEmpty().withMessage('معرف غرفة الدردشة مطلوب')
+      .isMongoId().withMessage('معرف غرفة الدردشة غير صالح'),
+      
+    body('content')
+      .optional()
+      .isString().withMessage('يجب أن يكون المحتوى نصيًا')
+      .isLength({ max: 2000 })
+      .withMessage('يجب ألا يتجاوز المحتوى 2000 حرف'),
+      
+    body('type')
+      .optional()
+      .isIn(['text', 'system', 'notification'])
+      .withMessage('نوع الرسالة غير صالح'),
+      
+    body('replyTo')
+      .optional()
+      .isMongoId()
+      .withMessage('معرف الرسالة المراد الرد عليها غير صالح'),
+  ],
+  
+  markAsRead: [
+    param('messageId')
+      .isMongoId()
+      .withMessage('معرف الرسالة غير صالح'),
+  ],
+  
+  delete: [
+    param('messageId')
+      .isMongoId()
+      .withMessage('معرف الرسالة غير صالح'),
+  ],
+  
+  updateReaction: [
+    param('messageId')
+      .isMongoId()
+      .withMessage('معرف الرسالة غير صالح'),
+      
+    body('emoji')
+      .notEmpty()
+      .withMessage('يجب إضافة إيموجي')
+      .isString()
+      .withMessage('يجب أن يكون الإيموجي نصيًا'),
+  ],
+  
+  search: [
+    query('roomId')
+      .isMongoId()
+      .withMessage('معرف الغرفة مطلوب'),
+      
+    query('query')
+      .notEmpty()
+      .withMessage('استعلام البحث مطلوب'),
+  ],
+  
+  typing: [
+    body('chatRoomId')
+      .isMongoId()
+      .withMessage('معرف غرفة الدردشة مطلوب'),
+      
+    body('isTyping')
+      .isBoolean()
+      .withMessage('حالة الكتابة مطلوبة'),
+  ],
+};
+
+// Chat room validation rules
+const chatRoomRules = {
+  create: [
+    body('name')
+      .optional()
+      .isString()
+      .withMessage('يجب أن يكون اسم الغرفة نصيًا')
+      .isLength({ max: 100 })
+      .withMessage('يجب ألا يتجاوز اسم الغرفة 100 حرف'),
+      
+    body('participants')
+      .isArray({ min: 1 })
+      .withMessage('يجب تحديد مشاركين واحد على الأقل')
+      .custom((participants) => {
+        if (!Array.isArray(participants)) return false;
+        return participants.every(id => typeof id === 'string' && id.match(/^[0-9a-fA-F]{24}$/));
+      })
+      .withMessage('يجب أن تكون قائمة المشاركين مصفوفة من المعرفات الصالحة'),
+      
+    body('projectId')
+      .optional()
+      .isMongoId()
+      .withMessage('معرف المشروع غير صالح'),
+  ],
+};
+
 module.exports = {
+  // Common
+  validate,
+  commonRules,
+  
+  // Auth
   validateRegister,
   validateLogin,
+  validatePasswordChange,
+  
+  // Messages
+  validateMessageCreate: validate(messageRules.create),
+  validateMessageMarkAsRead: validate(messageRules.markAsRead),
+  validateMessageDelete: validate(messageRules.delete),
+  validateMessageReaction: validate(messageRules.updateReaction),
+  validateMessageSearch: validate(messageRules.search),
+  validateTyping: validate(messageRules.typing),
+  
+  // Chat Rooms
+  validateChatRoomCreate: validate(chatRoomRules.create),
+  
+  // Keep existing validations for backward compatibility
   validateHero,
   validateAbout,
   validateService,
   validateServiceDetail,
   validateProjects,
-  validateProjectItem,
   validateJobs,
   validateJobItem,
+  validateProjectItem,
   validatePartners,
   validatePartnerItem,
   validateFeatures,
   validateCTA,
   validateFooter,
-  validateUserCreate,
-  validateUserUpdate,
-  validateProfileUpdate,
-  validateSubscribe,
-  validateSubscriberUpdate,
-  validateProject,
-  validateProjectUpdate,
   validateWork,
   validateWorkUpdate,
   validateServiceOrderCreate,
   validateServiceOrderUpdate,
+  validateUserCreate,
+  validateUserUpdate,
+  validateSubscribe,
+  validateSubscriberUpdate,
+  validateProject,
+  validateProjectUpdate,
   validateProposalCreate,
   validateProposalStatusUpdate,
   validateProposalUpdate,
-  validatePasswordChange,
-  validateChatRoomCreate,
-  validateMessageCreate,
+  validateProfileUpdate,
 };

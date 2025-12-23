@@ -1,59 +1,149 @@
 const Message = require("../models/messageModel");
 const ChatRoom = require("../models/chatRoomModel");
 const ProjectRoom = require("../models/projectRoomModel");
+const User = require("../models/userModel");
 const mongoose = require("mongoose");
+const { getWebSocketServer } = require('../websocket/websocket');
+const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/cloudinary');
+const { NotFoundError, ForbiddenError, BadRequestError } = require('../utils/errors');
 
-// Send a new message
-const sendMessage = async (req, res) => {
+// Send a new message with support for attachments, replies, and reactions
+const sendMessage = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
-    const { chatRoomId, content, type, attachments } = req.body;
+    const { chatRoomId, content, type = 'text', attachments = [], replyTo } = req.body;
     const senderId = req.user._id;
 
+    // Validate chat room exists and user is a participant
+    const chatRoom = await ChatRoom.findById(chatRoomId).session(session);
+    if (!chatRoom) {
+      throw new NotFoundError('غرفة الدردشة غير موجودة');
+    }
+
+    const isParticipant = chatRoom.participants.some(
+      p => p.user.toString() === senderId.toString()
+    );
+
+    if (!isParticipant && req.user.role !== 'admin') {
+      throw new ForbiddenError('غير مصرح لك بإرسال رسائل في هذه الغرفة');
+    }
+
+    // Handle file uploads if any
+    let uploadedAttachments = [];
+    if (req.files && req.files.length > 0) {
+      uploadedAttachments = await Promise.all(
+        req.files.map(async (file) => {
+          const result = await uploadToCloudinary(file.path);
+          return {
+            url: result.secure_url,
+            type: file.mimetype.split('/')[0], // 'image', 'video', etc.
+            name: file.originalname,
+            size: file.size,
+            publicId: result.public_id,
+          };
+        })
+      );
+    }
+
     // Create message
-    const message = await Message.create({
+    const messageData = {
       chatRoom: chatRoomId,
       sender: senderId,
-      content,
-      type: type || "text",
-      attachments: attachments || [],
-    });
+      content: content || '',
+      type,
+      attachments: [...attachments, ...uploadedAttachments],
+    };
+
+    if (replyTo) {
+      const repliedMessage = await Message.findById(replyTo).session(session);
+      if (repliedMessage) {
+        messageData.replyTo = repliedMessage._id;
+      }
+    }
+
+    const message = await Message.create([messageData], { session });
+    const newMessage = message[0];
 
     // Update chat room's last message
     chatRoom.lastMessage = {
-      content: content.substring(0, 100), // First 100 characters
+      content: content ? content.substring(0, 100) : 'مرفق',
       sender: senderId,
-      createdAt: message.createdAt,
+      messageId: newMessage._id,
+      createdAt: newMessage.createdAt,
     };
-    await chatRoom.save();
+    await chatRoom.save({ session });
 
-    // Update project room's last activity
-    const { getIO } = require("../socket");
-    
-    // Update project room's last activity
-    const projectRoom = await ProjectRoom.findById(chatRoom.projectRoom);
-    if (projectRoom) {
-      projectRoom.lastActivityAt = message.createdAt;
-      await projectRoom.save();
+    // Update project room's last activity if applicable
+    if (chatRoom.projectRoom) {
+      await ProjectRoom.findByIdAndUpdate(
+        chatRoom.projectRoom,
+        { lastActivityAt: newMessage.createdAt },
+        { session }
+      );
     }
-    
-    // Populate sender info before emitting
-    await message.populate("sender", "name email role avatar");
 
-    // Emit real-time message
-    try {
-      const io = getIO();
-      io.to(chatRoomId).emit("new_message", message);
-      console.log(`Emitted new_message to room ${chatRoomId}`);
-    } catch (socketError) {
-      console.error("Socket emit failed:", socketError.message);
-    }
+    await session.commitTransaction();
+    session.endSession();
+
+    // Populate sender and other references
+    await newMessage
+      .populate('sender', 'name email role avatar')
+      .populate({
+        path: 'replyTo',
+        select: 'content sender',
+        populate: {
+          path: 'sender',
+          select: 'name avatar',
+        },
+      })
+      .execPopulate();
+
+    // Emit real-time message via WebSocket
+    const wss = getWebSocketServer();
+    wss.broadcastToRoom(chatRoomId.toString(), {
+      type: 'new_message',
+      data: newMessage,
+    });
+
+    // Notify participants (except sender) about the new message
+    chatRoom.participants.forEach(participant => {
+      if (participant.user.toString() !== senderId.toString()) {
+        wss.sendToUser(participant.user.toString(), {
+          type: 'notification',
+          data: {
+            title: 'رسالة جديدة',
+            body: `رسالة جديدة في ${chatRoom.name || 'المحادثة'}`,
+            chatRoomId: chatRoom._id,
+            messageId: newMessage._id,
+          },
+        });
+      }
+    });
 
     res.status(201).json({
-      message: "تم إرسال الرسالة بنجاح",
-      data: message,
+      success: true,
+      message: 'تم إرسال الرسالة بنجاح',
+      data: newMessage,
     });
   } catch (error) {
-    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
+    await session.abortTransaction();
+    session.endSession();
+    
+    // Cleanup uploaded files if any error occurred
+    if (req.files && req.files.length > 0) {
+      await Promise.all(
+        req.files.map(file => {
+          if (file.path) {
+            const fs = require('fs');
+            fs.unlink(file.path, () => {});
+          }
+        })
+      );
+    }
+    
+    next(error);
   }
 };
 

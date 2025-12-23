@@ -1,38 +1,91 @@
-const express = require("express");
-const dotenv = require("dotenv");
-const cors = require("cors");
-const helmet = require("helmet");
-const mongoSanitize = require("express-mongo-sanitize");
-const rateLimit = require("express-rate-limit");
-const compression = require("compression");
-const morgan = require("morgan");
-const errorHandler = require("./middleware/errorHandler");
+require('module-alias/register');
+const express = require('express');
+const dotenv = require('dotenv');
+const path = require('path');
+const cors = require('cors');
+const compression = require('compression');
+const morgan = require('morgan');
+const http = require('http');
+const NodeCache = require('node-cache');
 
-// تحميل env
-dotenv.config();
+// Load environment variables
+dotenv.config({ path: path.join(__dirname, '.env') });
 
-const contentRoutes = require("./routes/contentRoutes");
-const authRoutes = require("./routes/authRoutes");
-const userRoutes = require("./routes/userRoutes");
-const subscriberRoutes = require("./routes/subscriberRoutes");
-const projectRoutes = require("./routes/projectRoutes");
-const portfolioRoutes = require("./routes/portfolioRoutes");
-const serviceOrderRoutes = require("./routes/serviceOrderRoutes");
-const proposalRoutes = require("./routes/proposalRoutes");
-// Chat system routes
-const projectRoomRoutes = require("./routes/projectRoomRoutes");
-const chatRoomRoutes = require("./routes/chatRoomRoutes");
-const messageRoutes = require("./routes/messageRoutes");
+// Import config
+const config = require('./config/config');
 
+// Import middlewares
+const { errorHandler } = require('@middleware/errorHandler');
+const { securityHeaders, apiLimiter, authLimiter, handlePreflight } = require('@middleware/security');
+const { requestLogger, errorLogger } = require('@utils/logger');
+
+// Import routes
+const contentRoutes = require('@routes/contentRoutes');
+const authRoutes = require('@routes/authRoutes');
+const userRoutes = require('@routes/userRoutes');
+const subscriberRoutes = require('@routes/subscriberRoutes');
+const projectRoutes = require('@routes/projectRoutes');
+const portfolioRoutes = require('@routes/portfolioRoutes');
+const serviceOrderRoutes = require('@routes/serviceOrderRoutes');
+const proposalRoutes = require('@routes/proposalRoutes');
+const projectRoomRoutes = require('@routes/projectRoomRoutes');
+const chatRoomRoutes = require('@routes/chatRoomRoutes');
+const messageRoutes = require('@routes/messageRoutes');
+
+// Initialize Express app
 const app = express();
+const server = http.createServer(app);
 
-// Middlewares
-app.use(
-  express.json({
-    limit: "20kb",
-    strict: true,
-  })
-);
+// Initialize WebSocket server
+const WebSocketServer = require('@websocket/websocket');
+const wss = new WebSocketServer(server);
+
+// Initialize cache with 10 minutes TTL
+const cache = new NodeCache({ stdTTL: 600 });
+
+// Make cache and WebSocket server available in app
+app.set('cache', cache);
+app.set('wss', wss);
+
+// Trust proxy
+app.set('trust proxy', 1);
+
+// Enable CORS pre-flight
+app.options('*', cors(config.corsOptions));
+
+// Security headers
+app.use(securityHeaders);
+
+// Handle preflight requests
+app.use(handlePreflight);
+
+// Enable CORS
+app.use(cors(config.corsOptions));
+
+// Compress responses
+app.use(compression());
+
+// Parse JSON request body
+app.use(express.json({ limit: config.fileUpload.maxFileUpload }));
+
+// Parse URL-encoded request body
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+
+// Logging middleware
+if (process.env.NODE_ENV !== 'test') {
+  app.use(requestLogger);
+  
+  // Log HTTP requests in development
+  if (process.env.NODE_ENV === 'development') {
+    app.use(morgan('dev'));
+  }
+}
+
+// Rate limiting for auth routes
+app.use('/api/v1/auth', authLimiter);
+
+// Apply API rate limiting to all routes
+app.use(apiLimiter);
 
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -96,33 +149,53 @@ app.get("/", (req, res) => {
   res.send("HIXA API is running");
 });
 
-// Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/content", contentRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/subscribers", subscriberRoutes);
-app.use("/api/projects", projectRoutes);
-app.use("/api/portfolio", portfolioRoutes);
-app.use("/api/service-orders", serviceOrderRoutes);
-app.use("/api/proposals", proposalRoutes);
-// Chat system routes
-app.use("/api/project-rooms", projectRoomRoutes);
-app.use("/api/chat-rooms", chatRoomRoutes);
-app.use("/api/messages", messageRoutes);
+// API Routes
+const API_PREFIX = '/api/v1';
 
-// 404 handler (route not found)
-app.use((req, res) => {
+// Public routes
+app.use(`${API_PREFIX}/health`, (req, res) => res.status(200).json({ status: 'ok' }));
+
+// API routes with versioning
+app.use(`${API_PREFIX}/content`, contentRoutes);
+app.use(`${API_PREFIX}/auth`, authRoutes);
+app.use(`${API_PREFIX}/users`, userRoutes);
+app.use(`${API_PREFIX}/subscribers`, subscriberRoutes);
+app.use(`${API_PREFIX}/projects`, projectRoutes);
+app.use(`${API_PREFIX}/portfolio`, portfolioRoutes);
+app.use(`${API_PREFIX}/service-orders`, serviceOrderRoutes);
+app.use(`${API_PREFIX}/proposals`, proposalRoutes);
+
+// Chat system routes
+app.use(`${API_PREFIX}/project-rooms`, projectRoomRoutes);
+app.use(`${API_PREFIX}/chat-rooms`, chatRoomRoutes);
+app.use(`${API_PREFIX}/messages`, messageRoutes);
+
+// Serve static files in production
+if (process.env.NODE_ENV === 'production') {
+  // Set static folder
+  app.use(express.static(path.join(__dirname, '../client/build')));
+  
+  // Handle SPA
+  app.get('*', (req, res) => {
+    res.sendFile(path.resolve(__dirname, '../client/build', 'index.html'));
+  });
+}
+
+// 404 handler
+app.all('*', (req, res, next) => {
   res.status(404).json({
-    message: "المسار غير موجود",
-    path: req.originalUrl,
+    success: false,
+    message: `لا يمكن العثور على ${req.originalUrl} على هذا الخادم!`,
   });
 });
 
-// Error handler
+// Error logging middleware
+app.use(errorLogger);
+
+// Global error handler
 app.use(errorHandler);
 
-module.exports = app;
-
+module.exports = { app, server };
 
 
 

@@ -5,6 +5,23 @@ const xss = require('xss-clean');
 const hpp = require('hpp');
 const { RateLimitExceededError } = require('../utils/errors');
 
+// Security best practices constants
+const SELF = "'self'";
+const UNSAFE_INLINE = "'unsafe-inline'";
+const UNSAFE_EVAL = "'unsafe-eval'";
+const DATA = 'data:';
+const BLOB = 'blob:';
+
+// CORS configuration
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'X-Access-Token'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 600, // 10 minutes
+};
+
 // Rate limiting for API routes (100 requests per 15 minutes)
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -30,25 +47,38 @@ const authLimiter = rateLimit({
 // Security headers middleware
 const securityHeaders = [
   // Set security HTTP headers
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", 'data:', 'https:'],
-        connectSrc: ["'self'", 'https://api.cloudinary.com'],
-        fontSrc: ["'self'", 'data:'],
-        objectSrc: ["'none'"],
-        upgradeInsecureRequests: [],
-      },
+  helmet.contentSecurityPolicy({
+    directives: {
+      defaultSrc: [SELF],
+      scriptSrc: [SELF, UNSAFE_INLINE, UNSAFE_EVAL],
+      scriptSrcAttr: [SELF, UNSAFE_INLINE],
+      styleSrc: [SELF, UNSAFE_INLINE, 'https://fonts.googleapis.com'],
+      imgSrc: [SELF, DATA, BLOB, 'https://res.cloudinary.com'],
+      connectSrc: [SELF, 'https://api.cloudinary.com', 'ws://localhost:*', 'wss://*'],
+      fontSrc: [SELF, 'https://fonts.gstatic.com', DATA],
+      mediaSrc: [SELF, DATA, BLOB],
+      objectSrc: ["'none'"],
+      frameSrc: [SELF, 'https://www.youtube.com', 'https://www.google.com'],
+      workerSrc: [SELF, BLOB],
+      childSrc: [SELF, BLOB],
+      formAction: [SELF],
+      frameAncestors: [SELF],
+      upgradeInsecureRequests: [],
     },
-    crossOriginEmbedderPolicy: false, // Required for some CDNs
-    frameguard: { action: 'deny' },
-    hidePoweredBy: true,
-    noSniff: true,
-    xssFilter: true,
   }),
+  // Security headers
+  helmet.crossOriginEmbedderPolicy({ policy: 'credentialless' }),
+  helmet.crossOriginOpenerPolicy({ policy: 'same-origin' }),
+  helmet.crossOriginResourcePolicy({ policy: 'same-site' }),
+  helmet.dnsPrefetchControl({ allow: false }),
+  helmet.frameguard({ action: 'deny' }),
+  helmet.hidePoweredBy(),
+  helmet.hsts({ maxAge: 31536000, includeSubDomains: true, preload: true }),
+  helmet.ieNoOpen(),
+  helmet.noSniff(),
+  helmet.permittedCrossDomainPolicies({ permittedPolicies: 'none' }),
+  helmet.referrerPolicy({ policy: 'strict-origin-when-cross-origin' }),
+  helmet.xssFilter(),
   
   // Prevent parameter pollution
   hpp({
@@ -70,29 +100,10 @@ const securityHeaders = [
 ];
 
 // CORS configuration
-const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true,
-  optionsSuccessStatus: 200, // Some legacy browsers (IE11, various SmartTVs) choke on 204
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'X-Requested-With',
-    'Accept',
-    'Origin',
-    'X-Access-Token',
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-};
+// This is used by app.js to configure CORS
 
-// Prevent CORS preflight issues
-const handlePreflight = (req, res, next) => {
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-  next();
-};
+// Preflight handler is now handled by the cors middleware
+const handlePreflight = (req, res, next) => next();
 
 // Add security headers to response
 const addSecurityHeaders = (req, res, next) => {

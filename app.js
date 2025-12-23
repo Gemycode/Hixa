@@ -7,6 +7,9 @@ const compression = require('compression');
 const morgan = require('morgan');
 const http = require('http');
 const NodeCache = require('node-cache');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
+const hpp = require('hpp');
 
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -16,8 +19,7 @@ const config = require('./config/config');
 
 // Import middlewares
 const { errorHandler } = require('@middleware/errorHandler');
-const { securityHeaders, apiLimiter, authLimiter, handlePreflight } = require('@middleware/security');
-const { requestLogger, errorLogger } = require('@utils/logger');
+const { apiLimiter, authLimiter } = require('@middleware/security');
 
 // Import routes
 const contentRoutes = require('@routes/contentRoutes');
@@ -50,31 +52,56 @@ app.set('wss', wss);
 // Trust proxy
 app.set('trust proxy', 1);
 
-// Enable CORS pre-flight
-app.options('*', cors(config.corsOptions));
+// Enable CORS with specific configuration
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'X-Access-Token']
+};
 
-// Security headers
-app.use(securityHeaders);
+// Apply security middleware first
+app.use(helmet());
 
-// Handle preflight requests
-app.use(handlePreflight);
+// Apply CORS with proper configuration
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'X-Access-Token'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 600 // 10 minutes
+}));
 
-// Enable CORS
-app.use(cors(config.corsOptions));
+// Apply rate limiting to API routes
+app.use("/api", apiLimiter);
+
+// Data sanitization against NoSQL injection
+app.use(mongoSanitize());
+
+// Prevent parameter pollution
+app.use(hpp({
+  whitelist: [
+    'duration',
+    'ratingsQuantity',
+    'ratingsAverage',
+    'maxGroupSize',
+    'difficulty',
+    'price'
+  ]
+}));
 
 // Compress responses
 app.use(compression());
 
 // Parse JSON request body
-app.use(express.json({ limit: config.fileUpload.maxFileUpload }));
+app.use(express.json({ limit: config.fileUpload?.maxFileUpload || '10mb' }));
 
 // Parse URL-encoded request body
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Logging middleware
 if (process.env.NODE_ENV !== 'test') {
-  app.use(requestLogger);
-  
   // Log HTTP requests in development
   if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));
@@ -83,11 +110,6 @@ if (process.env.NODE_ENV !== 'test') {
 
 // Rate limiting for auth routes
 app.use('/api/v1/auth', authLimiter);
-
-// Apply API rate limiting to all routes
-app.use(apiLimiter);
-
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Handle JSON parsing errors
 app.use((err, req, res, next) => {
@@ -126,23 +148,21 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-app.use(cors());
-app.use(helmet());
+// Data sanitization middleware
 app.use((req, res, next) => {
-  req.body = mongoSanitize.sanitize(req.body);
-  req.query = mongoSanitize.sanitize(req.query);
-  req.params = mongoSanitize.sanitize(req.params);
+  if (req.body) req.body = mongoSanitize.sanitize(req.body);
+  if (req.query) req.query = mongoSanitize.sanitize(req.query);
+  if (req.params) req.params = mongoSanitize.sanitize(req.params);
   next();
 });
-app.use(compression());
-app.use(morgan("dev"));
 
-// Rate Limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200,
-});
-app.use("/api", limiter);
+// HTTP request logging
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+}
+
+// Apply rate limiting to API routes
+app.use("/api", apiLimiter);
 
 // Root API check
 app.get("/", (req, res) => {
@@ -173,29 +193,34 @@ app.use(`${API_PREFIX}/messages`, messageRoutes);
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
   // Set static folder
-  app.use(express.static(path.join(__dirname, '../client/build')));
+  const staticPath = path.join(__dirname, 'client/build');
   
-  // Handle SPA
-  app.get('*', (req, res) => {
-    res.sendFile(path.resolve(__dirname, '../client/build', 'index.html'));
+  // Serve static files
+  app.use(express.static(staticPath));
+  
+  // Handle SPA - serve index.html for any non-API routes
+  app.get(/^(?!\/api).*/, (req, res) => {
+    res.sendFile(path.join(staticPath, 'index.html'));
+  });
+} else {
+  // 404 handler for API routes in development
+  app.all('/api/:any*', (req, res) => {
+    res.status(404).json({
+      success: false,
+      message: `API endpoint not found: ${req.originalUrl}`,
+    });
   });
 }
 
-// 404 handler
-app.all('*', (req, res, next) => {
-  res.status(404).json({
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  
+  res.status(err.statusCode || 500).json({
     success: false,
-    message: `لا يمكن العثور على ${req.originalUrl} على هذا الخادم!`,
+    message: err.message || 'حدث خطأ في الخادم',
+    error: process.env.NODE_ENV === 'development' ? err : {}
   });
 });
 
-// Error logging middleware
-app.use(errorLogger);
-
-// Global error handler
-app.use(errorHandler);
-
 module.exports = { app, server };
-
-
-

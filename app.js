@@ -85,6 +85,9 @@ app.use(`${API_PREFIX}/project-rooms`, projectRoomRoutes);
 app.use(`${API_PREFIX}/chat-rooms`, chatRoomRoutes);
 app.use(`${API_PREFIX}/messages`, messageRoutes);
 
+app.use('/api/auth', authRoutes);
+app.use('/api/portfolio', portfolioRoutes);
+
 app.get("/", (req, res) => res.send("HIXA API is running"));
 
 app.use(errorHandler);

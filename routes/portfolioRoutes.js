@@ -6,6 +6,8 @@ const { uploadFields } = require("../middleware/upload");
 const {
   createWork,
   getWorks,
+  getWorksByUser,
+  getWorksByCategory,
   getWorkById,
   updateWork,
   deleteWork,
@@ -28,6 +30,12 @@ router.post(
 
 // الحصول على كل الأعمال
 router.get("/", protect, getWorks);
+
+// الأعمال حسب القسم (Public)
+router.get("/category/:category", getWorksByCategory);
+
+// الأعمال حسب المستخدم (Public)
+router.get("/user/:userId", getWorksByUser);
 
 // الحصول على عمل معين
 router.get("/:id", protect, getWorkById);

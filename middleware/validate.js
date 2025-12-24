@@ -1084,6 +1084,49 @@ const chatRoomRules = {
   ],
 };
 
+// Notification validation (optional - mostly internal use)
+const validateNotificationCreate = (req, res, next) => {
+  // This is mostly for internal use, but can be used if needed
+  const schema = Joi.object({
+    user: Joi.string().required().messages({
+      "any.required": "المستخدم مطلوب",
+    }),
+    type: Joi.string()
+      .valid(
+        "project_approved",
+        "project_rejected",
+        "proposal_submitted",
+        "proposal_accepted",
+        "proposal_rejected",
+        "message_received",
+        "project_status_changed",
+        "project_completed",
+        "review_received",
+        "system_announcement"
+      )
+      .required()
+      .messages({
+        "any.required": "نوع الإشعار مطلوب",
+        "any.only": "نوع الإشعار غير صحيح",
+      }),
+    title: Joi.string().max(200).required().messages({
+      "any.required": "عنوان الإشعار مطلوب",
+      "string.max": "عنوان الإشعار يجب ألا يتجاوز 200 حرف",
+    }),
+    message: Joi.string().max(1000).required().messages({
+      "any.required": "محتوى الإشعار مطلوب",
+      "string.max": "محتوى الإشعار يجب ألا يتجاوز 1000 حرف",
+    }),
+  });
+
+  const { error } = schema.validate(req.body, { abortEarly: false });
+  if (error) {
+    const messages = error.details.map((detail) => detail.message).join(", ");
+    return res.status(400).json({ message: messages });
+  }
+  next();
+};
+
 module.exports = {
   // Common
   validate,
@@ -1136,4 +1179,5 @@ module.exports = {
   validateProposalStatusUpdate,
   validateProposalUpdate,
   validateProfileUpdate,
+  validateNotificationCreate,
 };

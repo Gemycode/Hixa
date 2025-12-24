@@ -3,6 +3,7 @@ const ProjectRoom = require("../models/projectRoomModel");
 const ChatRoom = require("../models/chatRoomModel");
 const Message = require("../models/messageModel");
 const { uploadToCloudinary, uploadFileToCloudinary, deleteFromCloudinary } = require("../middleware/upload");
+const { getSystemUserId } = require("../utils/systemUser");
 
 // Helper to sanitize project data for response
 const sanitizeProject = (project) => {
@@ -307,9 +308,10 @@ exports.updateProject = async (req, res, next) => {
           });
 
           // Send system message about hiring
+          const systemUserId = await getSystemUserId();
           const systemMessage = await Message.create({
             chatRoom: groupChatRoom._id,
-            sender: "system",
+            sender: systemUserId,
             content: `تم توظيف المهندس ${req.user.name || 'مجهول'} للمشروع "${project.title}". يمكنكم الآن التواصل مباشرة.`,
             type: "system",
           });
@@ -317,7 +319,7 @@ exports.updateProject = async (req, res, next) => {
           // Update chat room's last message
           groupChatRoom.lastMessage = {
             content: systemMessage.content.substring(0, 100),
-            sender: "system",
+            sender: systemUserId,
             createdAt: systemMessage.createdAt,
           };
           await groupChatRoom.save();
@@ -359,9 +361,10 @@ exports.updateProject = async (req, res, next) => {
             await groupChatRoom.save();
             
             // Send system message about adding participants
+            const systemUserId = await getSystemUserId();
             const systemMessage = await Message.create({
               chatRoom: groupChatRoom._id,
-              sender: "system",
+              sender: systemUserId,
               content: `تم تحديث المشاركين في مجموعة المشروع "${project.title}".`,
               type: "system",
             });
@@ -369,7 +372,7 @@ exports.updateProject = async (req, res, next) => {
             // Update chat room's last message
             groupChatRoom.lastMessage = {
               content: systemMessage.content.substring(0, 100),
-              sender: "system",
+              sender: systemUserId,
               createdAt: systemMessage.createdAt,
             };
             await groupChatRoom.save();

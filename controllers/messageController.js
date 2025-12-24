@@ -6,6 +6,8 @@ const mongoose = require("mongoose");
 const { getWebSocketServer } = require('../websocket/websocket');
 const { uploadFileToCloudinary } = require('../middleware/upload');
 const { NotFoundError, ForbiddenError, BadRequestError } = require('../utils/errors');
+const { createNotification } = require('./notificationController');
+const { getSystemUserId } = require('../utils/systemUser');
 
 // Send a new message with support for attachments, replies, and reactions
 const sendMessage = async (req, res, next) => {
@@ -111,20 +113,32 @@ const sendMessage = async (req, res, next) => {
       data: newMessage,
     });
 
-    // Notify participants (except sender) about the new message
-    chatRoom.participants.forEach(participant => {
-      if (participant.user.toString() !== senderId.toString()) {
-        wss.sendToUser(participant.user.toString(), {
-          type: 'notification',
-          data: {
+    // Create notifications for participants (except sender) about the new message
+    const senderName = req.user.name || 'مجهول';
+    const notificationPromises = chatRoom.participants
+      .filter(participant => participant.user.toString() !== senderId.toString())
+      .map(async (participant) => {
+        try {
+          await createNotification({
+            user: participant.user,
+            type: 'message_received',
             title: 'رسالة جديدة',
-            body: `رسالة جديدة في ${chatRoom.name || 'المحادثة'}`,
-            chatRoomId: chatRoom._id,
-            messageId: newMessage._id,
-          },
-        });
-      }
-    });
+            message: `${senderName}: ${content ? content.substring(0, 100) : 'مرفق'}`,
+            data: {
+              chatRoomId: chatRoom._id,
+              messageId: newMessage._id,
+            },
+            actionUrl: `/chat/${chatRoom._id}`,
+          });
+        } catch (error) {
+          console.error('Error creating notification:', error);
+        }
+      });
+
+    // Run notifications in parallel (don't await to avoid blocking)
+    Promise.all(notificationPromises).catch(err => 
+      console.error('Error creating notifications:', err)
+    );
 
     res.status(201).json({
       success: true,

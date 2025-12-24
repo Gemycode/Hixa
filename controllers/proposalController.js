@@ -3,6 +3,7 @@ const Project = require("../models/projectModel");
 const ProjectRoom = require("../models/projectRoomModel");
 const ChatRoom = require("../models/chatRoomModel");
 const Message = require("../models/messageModel");
+const { getSystemUserId } = require("../utils/systemUser");
 
 // Format proposal for responses
 const sanitizeProposal = (proposal, userRole = null) => {
@@ -151,9 +152,10 @@ exports.createProposal = async (req, res, next) => {
         console.log(`Created Admin-Client ChatRoom for project ${projectId}`);
         
         // Send system message in Admin-Client ChatRoom
+        const systemUserId = await getSystemUserId();
         const systemMessageClient = await Message.create({
           chatRoom: adminClientChatRoom._id,
-          sender: "system",
+          sender: systemUserId,
           content: `قام المهندس ${req.user.name || 'مجهول'} بتقديم عرض على مشروعك "${project.title}". سيتم التواصل معك قريباً.`,
           type: "system",
         });
@@ -161,16 +163,17 @@ exports.createProposal = async (req, res, next) => {
         // Update chat room's last message
         adminClientChatRoom.lastMessage = {
           content: systemMessageClient.content.substring(0, 100),
-          sender: "system",
+          sender: systemUserId,
           createdAt: systemMessageClient.createdAt,
         };
         await adminClientChatRoom.save();
       }
 
       // Send system message in Admin-Engineer ChatRoom
+      const systemUserId = await getSystemUserId();
       const systemMessageEngineer = await Message.create({
         chatRoom: adminEngineerChatRoom._id,
-        sender: "system",
+        sender: systemUserId,
         content: `قام المهندس ${req.user.name || 'مجهول'} بتقديم عرض على المشروع "${project.title}". يرجى التواصل معه لإجراء مقابلة.`,
         type: "system",
       });
@@ -178,7 +181,7 @@ exports.createProposal = async (req, res, next) => {
       // Update chat room's last message
       adminEngineerChatRoom.lastMessage = {
         content: systemMessageEngineer.content.substring(0, 100),
-        sender: "system",
+        sender: systemUserId,
         createdAt: systemMessageEngineer.createdAt,
       };
       await adminEngineerChatRoom.save();
@@ -337,9 +340,10 @@ exports.updateProposalStatus = async (req, res, next) => {
           });
 
           // Send system message about acceptance
+          const systemUserId = await getSystemUserId();
           const systemMessage = await Message.create({
             chatRoom: groupChatRoom._id,
-            sender: "system",
+            sender: systemUserId,
             content: `تم قبول العرض وتم تعيين المهندس للمشروع "${project.title}". يمكنكم الآن التواصل مباشرة.`,
             type: "system",
           });
@@ -347,7 +351,7 @@ exports.updateProposalStatus = async (req, res, next) => {
           // Update chat room's last message
           groupChatRoom.lastMessage = {
             content: systemMessage.content.substring(0, 100),
-            sender: "system",
+            sender: systemUserId,
             createdAt: systemMessage.createdAt,
           };
           await groupChatRoom.save();
@@ -370,16 +374,17 @@ exports.updateProposalStatus = async (req, res, next) => {
             await groupChatRoom.save();
 
             // Send system message about adding engineer
+            const systemUserId = await getSystemUserId();
             const systemMessage = await Message.create({
               chatRoom: groupChatRoom._id,
-              sender: "system",
+              sender: systemUserId,
               content: `تم قبول العرض وتم إضافة المهندس للمشروع "${project.title}".`,
               type: "system",
             });
             
             groupChatRoom.lastMessage = {
               content: systemMessage.content.substring(0, 100),
-              sender: "system",
+              sender: systemUserId,
               createdAt: systemMessage.createdAt,
             };
             await groupChatRoom.save();

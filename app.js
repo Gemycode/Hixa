@@ -27,6 +27,7 @@ const proposalRoutes = require('@routes/proposalRoutes');
 const projectRoomRoutes = require('@routes/projectRoomRoutes');
 const chatRoomRoutes = require('@routes/chatRoomRoutes');
 const messageRoutes = require('@routes/messageRoutes');
+const notificationRoutes = require('@routes/notificationRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -84,6 +85,7 @@ app.use(`${API_PREFIX}proposals`, proposalRoutes);
 app.use(`${API_PREFIX}project-rooms`, projectRoomRoutes);
 app.use(`${API_PREFIX}chat-rooms`, chatRoomRoutes);
 app.use(`${API_PREFIX}messages`, messageRoutes);
+app.use(`${API_PREFIX}notifications`, notificationRoutes);
 
 app.get("/", (req, res) => res.send("HIXA API is running"));
 

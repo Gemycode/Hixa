@@ -1,6 +1,7 @@
 const ProjectRoom = require("../models/projectRoomModel");
 const Project = require("../models/projectModel");
 const ChatRoom = require("../models/chatRoomModel");
+const Proposal = require("../models/proposalModel");
 const mongoose = require("mongoose");
 
 // Get all project rooms for dashboard
@@ -19,17 +20,22 @@ const getProjectRooms = async (req, res) => {
       projectRoomQuery = { "project": { $in: projectIds } };
     } else if (userRole === "engineer") {
       // Engineers see only project rooms for projects they've submitted proposals to
-      // This would require joining with Proposal model, but for now we'll return empty
-      // In a complete implementation, you'd need to join with proposals
-      return res.json({
-        data: [],
-        meta: {
-          total: 0,
-          page: 1,
-          limit: 10,
-          pages: 1,
-        },
-      });
+      const engineerProposals = await Proposal.find({ engineer: userId }).select("project");
+      const projectIds = engineerProposals.map(prop => prop.project);
+      
+      if (projectIds.length === 0) {
+        return res.json({
+          data: [],
+          meta: {
+            total: 0,
+            page: 1,
+            limit: 10,
+            pages: 1,
+          },
+        });
+      }
+      
+      projectRoomQuery = { "project": { $in: projectIds } };
     }
     // Admins see all project rooms (no filter needed)
 
@@ -82,8 +88,19 @@ const getProjectRoomById = async (req, res) => {
       }
     } else if (userRole === "engineer") {
       // Check if engineer has submitted proposal for this project
-      // In a complete implementation, you'd check against proposals
-      return res.status(403).json({ message: "غير مسموح لك بالوصول إلى هذه الغرفة" });
+      const project = await Project.findById(projectRoom.project);
+      if (!project) {
+        return res.status(404).json({ message: "المشروع غير موجود" });
+      }
+      
+      const hasProposal = await Proposal.findOne({
+        project: projectRoom.project,
+        engineer: userId,
+      });
+      
+      if (!hasProposal) {
+        return res.status(403).json({ message: "غير مسموح لك بالوصول إلى هذه الغرفة" });
+      }
     }
     // Admins can access all project rooms
 
@@ -112,14 +129,20 @@ const getProjectRoomByProjectId = async (req, res) => {
 
     // Check permissions
     if (userRole === "client") {
-      const project = await Project.findById(projectRoom.project);
+      const project = await Project.findById(projectId);
       if (!project || project.client.toString() !== userId.toString()) {
         return res.status(403).json({ message: "غير مسموح لك بالوصول إلى هذه الغرفة" });
       }
     } else if (userRole === "engineer") {
       // Check if engineer has submitted proposal for this project
-      // In a complete implementation, you'd check against proposals
-      return res.status(403).json({ message: "غير مسموح لك بالوصول إلى هذه الغرفة" });
+      const hasProposal = await Proposal.findOne({
+        project: projectId,
+        engineer: userId,
+      });
+      
+      if (!hasProposal) {
+        return res.status(403).json({ message: "غير مسموح لك بالوصول إلى هذه الغرفة" });
+      }
     }
     // Admins can access all project rooms
 

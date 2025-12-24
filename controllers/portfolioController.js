@@ -1,6 +1,6 @@
 const Work = require("../models/workModel");
 const { uploadToCloudinary, deleteFromCloudinary } = require("../middleware/upload");
-
+const mongoose = require("mongoose");
 const WORK_STATUSES = ["Pending Review", "In Progress", "Completed"];
 
 const parseArrayField = (value) => {
@@ -146,6 +146,45 @@ exports.getWorksByCategory = async (req, res, next) => {
         limit,
         pages: Math.ceil(total / limit) || 1,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET works by user ID (public)
+exports.getWorksByUser = async (req, res, next) => {
+  try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 9, 1), 100);
+    const skip = (page - 1) * limit;
+    const { userId } = req.params;
+
+    // Validate if userId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "معرف المستخدم غير صالح" });
+    }
+
+    const filters = { 
+      isActive: true, 
+      createdBy: userId 
+    };
+
+    const [works, total] = await Promise.all([
+      Work.find(filters)
+        .sort({ date: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Work.countDocuments(filters),
+    ]);
+
+    res.json({
+      success: true,
+      count: works.length,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      data: works.map(work => sanitizeWork(work)),
     });
   } catch (error) {
     next(error);

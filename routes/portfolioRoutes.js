@@ -8,6 +8,7 @@ const {
   getWorkById,
   updateWork,
   deleteWork,
+  getWorksByUser, 
 } = require("../controllers/portfolioController");
 const { protect, engineerOrAdmin } = require("../middleware/auth");
 const { validateWork, validateWorkUpdate } = require("../middleware/validate");
@@ -17,7 +18,7 @@ const { uploadFields } = require("../middleware/upload");
 router.get("/", getWorks);
 router.get("/category/:category", getWorksByCategory);
 router.get("/:id", getWorkById);
-
+router.get("/user/:userId", getWorksByUser);
 // Protected CRUD
 router.post(
   "/",

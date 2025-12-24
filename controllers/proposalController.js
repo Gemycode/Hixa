@@ -5,11 +5,27 @@ const ChatRoom = require("../models/chatRoomModel");
 const Message = require("../models/messageModel");
 
 // Format proposal for responses
-const sanitizeProposal = (proposal) => {
+const sanitizeProposal = (proposal, userRole = null) => {
   const obj = proposal.toObject ? proposal.toObject() : proposal;
+  
+  // Handle project sanitization based on user role
+  let project = obj.project;
+  if (project && typeof project === 'object') {
+    // Clone project to avoid mutating original
+    project = { ...project };
+    
+    // Hide sensitive admin information from engineers
+    if (userRole === "engineer" && project.adminApproval) {
+      project.adminApproval = {
+        status: project.adminApproval.status, // فقط حالة الموافقة
+        // لا نعرض reviewedBy, reviewedAt, rejectionReason للمهندسين
+      };
+    }
+  }
+  
   return {
     id: obj._id,
-    project: obj.project,
+    project: project,
     engineer: obj.engineer,
     description: obj.description,
     estimatedTimeline: obj.estimatedTimeline,
@@ -178,7 +194,7 @@ exports.createProposal = async (req, res, next) => {
 
     res.status(201).json({
       message: "تم إرسال العرض بنجاح",
-      data: sanitizeProposal(proposal),
+      data: sanitizeProposal(proposal, req.user.role),
     });
   } catch (error) {
     if (error.code === 11000) {
@@ -214,7 +230,7 @@ exports.getProposalsByProject = async (req, res, next) => {
       .populate("project", "title client status adminApproval");
 
     res.json({
-      data: proposals.map(sanitizeProposal),
+      data: proposals.map(p => sanitizeProposal(p, req.user.role)),
     });
   } catch (error) {
     next(error);
@@ -233,7 +249,7 @@ exports.getMyProposals = async (req, res, next) => {
       .populate("project", "title status assignedEngineer client adminApproval");
 
     res.json({
-      data: proposals.map(sanitizeProposal),
+      data: proposals.map(p => sanitizeProposal(p, req.user.role)),
     });
   } catch (error) {
     next(error);
@@ -379,7 +395,7 @@ exports.updateProposalStatus = async (req, res, next) => {
 
     res.json({
       message: "تم تحديث حالة العرض",
-      data: sanitizeProposal(proposal),
+      data: sanitizeProposal(proposal, req.user.role),
     });
   } catch (error) {
     next(error);
@@ -430,7 +446,7 @@ exports.updateProposal = async (req, res, next) => {
 
     res.json({
       message: "تم تحديث العرض بنجاح",
-      data: sanitizeProposal(proposal),
+      data: sanitizeProposal(proposal, req.user.role),
     });
   } catch (error) {
     next(error);

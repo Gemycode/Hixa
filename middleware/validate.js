@@ -1,5 +1,4 @@
 const { body, param, query, validationResult } = require('express-validator');
-const { StatusCodes } = require('http-status-codes');
 const { BadRequestError } = require('../utils/errors');
 
 const Joi = require('joi');
@@ -48,9 +47,7 @@ const validate = (validations) => {
     const extractedErrors = [];
     errors.array().map(err => extractedErrors.push({ [err.param]: err.msg }));
 
-    throw new BadRequestError('بيانات غير صالحة', {
-      errors: extractedErrors,
-    });
+    return next(new BadRequestError('بيانات غير صالحة', 400, extractedErrors));
   };
 };
 

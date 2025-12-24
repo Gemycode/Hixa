@@ -1,4 +1,3 @@
-const { StatusCodes } = require('http-status-codes');
 
 /**
  * Success response handler
@@ -12,7 +11,7 @@ const successResponse = (
   res,
   data = null,
   message = 'تمت العملية بنجاح',
-  statusCode = StatusCodes.OK
+  statusCode = 200
 ) => {
   const response = {
     success: true,
@@ -49,7 +48,7 @@ const errorResponse = (
   res,
   error,
   defaultMessage = 'حدث خطأ ما',
-  defaultStatusCode = StatusCodes.INTERNAL_SERVER_ERROR
+  defaultStatusCode = 500
 ) => {
   // Log the error for debugging
   if (process.env.NODE_ENV !== 'production') {
@@ -102,7 +101,6 @@ const errorResponse = (
 module.exports = {
   successResponse,
   errorResponse,
-  StatusCodes,
 };
 
 // Example usage in a controller:

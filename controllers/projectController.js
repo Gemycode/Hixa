@@ -130,14 +130,13 @@ exports.getProjects = async (req, res, next) => {
     filters.isActive = true;
 
     // Clients see all their projects (including rejected)
-    // Engineers and Admin only see approved projects (unless filtering by status)
-    if (req.user.role !== "client" && !status) {
+    // Engineers only see approved projects (unless filtering by status)
+    // Admin sees all projects (including rejected)
+    if (req.user.role === "engineer" && !status) {
       filters["adminApproval.status"] = "approved";
-      filters.status = { $ne: "Rejected" }; // لا تظهر المشاريع المرفوضة
-    } else if (req.user.role === "client" && !status) {
-      // Clients can see their pending, approved, and rejected projects
-      // No filter needed
+      filters.status = { $ne: "Rejected" }; // المهندسين لا يرون المشاريع المرفوضة
     }
+    // Admin و Client يرون جميع المشاريع (لا حاجة لفلتر إضافي)
 
     const [projects, total] = await Promise.all([
       Project.find(filters)

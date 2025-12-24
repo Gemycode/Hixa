@@ -9,6 +9,7 @@ const generateToken = (userId, role) => {
   );
 };
 
+// General register (backward compatibility)
 const register = async (req, res) => {
   try {
     const { email, password, name, role } = req.body;
@@ -34,6 +35,137 @@ const register = async (req, res) => {
   }
 };
 
+// Register Company
+const registerCompany = async (req, res) => {
+  try {
+    const { companyName, contactPersonName, email, password } = req.body;
+
+    if (await User.findOne({ email })) {
+      return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
+    }
+
+    const user = await User.create({
+      email,
+      password,
+      name: companyName, // استخدام companyName كاسم الشركة
+      role: "client", // الشركات تعتبر clients
+      phone: "", // يمكن إضافته لاحقاً
+    });
+
+    // يمكن حفظ contactPersonName في bio أو حقل آخر
+    if (contactPersonName) {
+      user.bio = `Contact Person: ${contactPersonName}`;
+      await user.save();
+    }
+
+    const token = generateToken(user._id, user.role);
+    user.lastLogin = new Date();
+    await user.save();
+
+    res.status(201).json({ 
+      message: "تم تسجيل الشركة بنجاح", 
+      token, 
+      user: {
+        _id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      }
+    });
+  } catch (e) {
+    if (e.code === 11000) {
+      return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
+    }
+    res.status(500).json({ message: "خطأ في الخادم", error: e.message });
+  }
+};
+
+// Register Engineer
+const registerEngineer = async (req, res) => {
+  try {
+    const { fullName, specialization, licenseNumber, email, password } = req.body;
+
+    if (await User.findOne({ email })) {
+      return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
+    }
+
+    // التحقق من أن licenseNumber فريد
+    if (licenseNumber && await User.findOne({ nationalId: licenseNumber })) {
+      return res.status(409).json({ message: "رقم الترخيص مستخدم بالفعل" });
+    }
+
+    const user = await User.create({
+      email,
+      password,
+      name: fullName,
+      role: "engineer",
+      nationalId: licenseNumber || undefined, // استخدام nationalId لحفظ licenseNumber
+      specializations: specialization ? [specialization] : [], // حفظ specialization
+    });
+
+    const token = generateToken(user._id, user.role);
+    user.lastLogin = new Date();
+    await user.save();
+
+    res.status(201).json({ 
+      message: "تم تسجيل المهندس بنجاح", 
+      token, 
+      user: {
+        _id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        specializations: user.specializations,
+        nationalId: user.nationalId,
+      }
+    });
+  } catch (e) {
+    if (e.code === 11000) {
+      const field = e.keyPattern?.email ? "البريد الإلكتروني" : "رقم الترخيص";
+      return res.status(409).json({ message: `${field} مستخدم بالفعل` });
+    }
+    res.status(500).json({ message: "خطأ في الخادم", error: e.message });
+  }
+};
+
+// Register Client
+const registerClient = async (req, res) => {
+  try {
+    const { fullName, email, password } = req.body;
+
+    if (await User.findOne({ email })) {
+      return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
+    }
+
+    const user = await User.create({
+      email,
+      password,
+      name: fullName,
+      role: "client",
+    });
+
+    const token = generateToken(user._id, user.role);
+    user.lastLogin = new Date();
+    await user.save();
+
+    res.status(201).json({ 
+      message: "تم تسجيل العميل بنجاح", 
+      token, 
+      user: {
+        _id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      }
+    });
+  } catch (e) {
+    if (e.code === 11000) {
+      return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
+    }
+    res.status(500).json({ message: "خطأ في الخادم", error: e.message });
+  }
+};
+
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -55,4 +187,10 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { register, login };
+module.exports = { 
+  register, 
+  registerCompany,
+  registerEngineer,
+  registerClient,
+  login 
+};

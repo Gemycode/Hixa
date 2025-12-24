@@ -11,46 +11,30 @@ const {
   deleteAttachment,
   getProjectStatistics,
 } = require("../controllers/projectController");
-const { protect, clientOnly, adminOnly } = require("../middleware/auth");
+
+const { protect, restrictTo } = require("../middleware/auth");
 const { validateProject, validateProjectUpdate } = require("../middleware/validate");
 const { uploadSingleFile } = require("../middleware/upload");
 
 // All routes require authentication
 router.use(protect);
 
-// Statistics (all authenticated users)
+// Statistics
 router.get("/statistics", getProjectStatistics);
 
-// Get all projects (filtered by role)
+// Get projects
 router.get("/", getProjects);
-
-// Get single project
 router.get("/:id", getProjectById);
 
-// Create project (Client only)
-router.post("/", clientOnly, validateProject, createProject);
+// Create project (client)
+router.post("/", restrictTo("client"), validateProject, createProject);
 
-// Update project (Client can update their own, Admin can update any)
+// Update/delete project
 router.put("/:id", validateProjectUpdate, updateProject);
-
-// Delete project (Client can delete their own, Admin can delete any)
 router.delete("/:id", deleteProject);
 
-// Upload attachment (Client can upload to their own projects) - accepts any file type
+// Attachments
 router.post("/:id/attachments", uploadSingleFile("file"), uploadAttachment);
-
-// Delete attachment (Client can delete from their own projects)
 router.delete("/:id/attachments/:attachmentId", deleteAttachment);
 
 module.exports = router;
-
-
-
-
-
-
-
-
-
-
-

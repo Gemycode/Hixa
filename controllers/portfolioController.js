@@ -155,13 +155,11 @@ exports.getWorksByCategory = async (req, res, next) => {
 // GET works by user ID (public)
 exports.getWorksByUser = async (req, res, next) => {
   try {
-    // Create a clean copy of the request parameters
     const userId = String(req.params.userId || '');
     const page = Math.max(parseInt(String(req.query.page || '1'), 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(String(req.query.limit || '9'), 10) || 9, 1), 100);
     const skip = (page - 1) * limit;
 
-    // Validate if userId is a valid ObjectId
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ 
         success: false,
@@ -169,13 +167,11 @@ exports.getWorksByUser = async (req, res, next) => {
       });
     }
 
-    // Create a clean filters object
     const filters = { 
       isActive: true, 
       createdBy: new mongoose.Types.ObjectId(userId)
     };
 
-    // Execute queries with proper error handling
     const [works, total] = await Promise.all([
       Work.find(filters)
         .sort({ date: -1, createdAt: -1 })
@@ -185,10 +181,8 @@ exports.getWorksByUser = async (req, res, next) => {
       Work.countDocuments(filters),
     ]);
 
-    // Sanitize and return the response
     const sanitizedWorks = works.map(work => {
       const sanitized = sanitizeWork(work);
-      // Ensure we're not sending internal fields
       delete sanitized.__v;
       return sanitized;
     });
@@ -266,7 +260,6 @@ exports.updateWork = async (req, res, next) => {
     }
 
     if (galleryFiles.length > 0) {
-      // replace gallery when new files provided
       for (const img of work.gallery || []) {
         if (img.url && img.url.includes("cloudinary.com")) {
           await deleteFromCloudinary(img.url);
@@ -315,5 +308,3 @@ exports.deleteWork = async (req, res, next) => {
     next(error);
   }
 };
-
-

@@ -19,7 +19,9 @@ const {
   updateFooter,
   uploadImage,
 } = require("../controllers/contentController");
-const { protect, adminOnly } = require("../middleware/auth");
+
+const { protect, restrictTo } = require("../middleware/auth");
+
 const {
   validateHero,
   validateAbout,
@@ -31,41 +33,40 @@ const {
   validateCTA,
   validateFooter,
 } = require("../middleware/validate");
+
 const { uploadSingle, uploadFields } = require("../middleware/upload");
 
-// Public route - get all content
+// Public
 router.get("/", getContent);
 
-// Protected admin routes - update content sections
-router.put("/hero", protect, adminOnly, validateHero, updateHero);
-router.put("/about", protect, adminOnly, validateAbout, updateAbout);
+// Admin protected
+router.put("/hero", protect, restrictTo("admin"), validateHero, updateHero);
+router.put("/about", protect, restrictTo("admin"), validateAbout, updateAbout);
 
-// Services routes
-router.get("/services", getServices); // Public - get all services
-router.get("/services/:itemId", getService); // Public - get single service (item1, item2, item3, item4)
-router.put("/services/:itemId", protect, adminOnly, validateService, updateService); // Update service
-router.put("/services/:itemId/details/:detailId", protect, adminOnly, validateServiceDetail, updateServiceDetail); // Update service detail
-router.post("/services/:itemId/details/:detailId/image", protect, adminOnly, uploadSingle("image"), uploadServiceDetailImage); // Upload image for service detail
+// Services
+router.get("/services", getServices);
+router.get("/services/:itemId", getService);
+router.put("/services/:itemId", protect, restrictTo("admin"), validateService, updateService);
+router.put("/services/:itemId/details/:detailId", protect, restrictTo("admin"), validateServiceDetail, updateServiceDetail);
+router.post("/services/:itemId/details/:detailId/image", protect, restrictTo("admin"), uploadSingle("image"), uploadServiceDetailImage);
 
-// Projects route - accepts multiple images with field names like image_0, image_1, etc.
-router.put("/projects", protect, adminOnly, (req, res, next) => {
-  // Dynamically create fields array based on items count (max 20 items)
+// Projects
+router.put("/projects", protect, restrictTo("admin"), (req, res, next) => {
   const fields = [];
-  for (let i = 0; i < 20; i++) {
-    fields.push({ name: `image_${i}`, maxCount: 1 });
-  }
+  for (let i = 0; i < 20; i++) fields.push({ name: `image_${i}`, maxCount: 1 });
   uploadFields(fields)(req, res, next);
 }, validateProjects, updateProjects);
 
-// Projects items CRUD operations
-router.post("/projects/items", protect, adminOnly, uploadSingle("image"), validateProjectItem, addProjectItem);
-router.put("/projects/items/:id", protect, adminOnly, uploadSingle("image"), validateProjectItem, updateProjectItem);
-router.delete("/projects/items/:id", protect, adminOnly, deleteProjectItem);
-router.put("/features", protect, adminOnly, validateFeatures, updateFeatures);
-router.put("/cta", protect, adminOnly, validateCTA, updateCTA);
-router.put("/footer", protect, adminOnly, validateFooter, updateFooter);
+// Project items
+router.post("/projects/items", protect, restrictTo("admin"), uploadSingle("image"), validateProjectItem, addProjectItem);
+router.put("/projects/items/:id", protect, restrictTo("admin"), uploadSingle("image"), validateProjectItem, updateProjectItem);
+router.delete("/projects/items/:id", protect, restrictTo("admin"), deleteProjectItem);
 
-// Image upload route
-router.post("/upload", protect, adminOnly, uploadSingle("image"), uploadImage);
+router.put("/features", protect, restrictTo("admin"), validateFeatures, updateFeatures);
+router.put("/cta", protect, restrictTo("admin"), validateCTA, updateCTA);
+router.put("/footer", protect, restrictTo("admin"), validateFooter, updateFooter);
+
+// Upload
+router.post("/upload", protect, restrictTo("admin"), uploadSingle("image"), uploadImage);
 
 module.exports = router;

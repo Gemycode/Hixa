@@ -1,39 +1,23 @@
 const express = require("express");
 const router = express.Router();
-
-// Import controllers
+const { protect, restrictTo } = require("../middleware/auth");
+const { validateWork, validateWorkUpdate } = require("../middleware/validate");
+const { uploadFields } = require("../middleware/upload");
 const {
   createWork,
   getWorks,
-  getWorksByCategory,
   getWorkById,
   updateWork,
   deleteWork,
-  getWorksByUser,
 } = require("../controllers/portfolioController");
 
-// Import middleware
-const { protect, engineerOrAdmin } = require("../middleware/auth");
-const { validateWork, validateWorkUpdate } = require("../middleware/validate");
-const { uploadFields } = require("../middleware/upload");
+// حماية لمسارات المهندسين والإدمن
+const engineerOrAdmin = [protect, restrictTo("engineer", "admin")];
 
-// ====================
-// Public Routes
-// ====================
-router.get("/", getWorks);
-router.get("/category/:category", getWorksByCategory);
-router.get("/user/:userId", getWorksByUser);
-router.get("/:id", getWorkById);
-
-// ====================
-// Protected Routes
-// ====================
-router.use(protect); // Apply protect middleware to all routes below
-
-// Create work
+// إنشاء عمل جديد
 router.post(
   "/",
-  engineerOrAdmin,
+  ...engineerOrAdmin,
   uploadFields([
     { name: "image", maxCount: 1 },
     { name: "gallery", maxCount: 10 },
@@ -42,10 +26,16 @@ router.post(
   createWork
 );
 
-// Update work
+// الحصول على كل الأعمال
+router.get("/", protect, getWorks);
+
+// الحصول على عمل معين
+router.get("/:id", protect, getWorkById);
+
+// تعديل عمل موجود
 router.put(
   "/:id",
-  engineerOrAdmin,
+  ...engineerOrAdmin,
   uploadFields([
     { name: "image", maxCount: 1 },
     { name: "gallery", maxCount: 10 },
@@ -54,8 +44,7 @@ router.put(
   updateWork
 );
 
-// Delete work
-router.delete("/:id", engineerOrAdmin, deleteWork);
+// حذف عمل
+router.delete("/:id", ...engineerOrAdmin, deleteWork);
 
 module.exports = router;
-

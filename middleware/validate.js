@@ -2,6 +2,12 @@ const { body, param, query, validationResult } = require('express-validator');
 const { StatusCodes } = require('http-status-codes');
 const { BadRequestError } = require('../utils/errors');
 
+const Joi = require('joi');
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+const roles = ['admin', 'engineer', 'client', 'customer'];
+
 // Reusable validation rules
 const commonRules = {
   email: {

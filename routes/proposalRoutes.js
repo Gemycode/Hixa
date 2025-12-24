@@ -8,6 +8,7 @@ const {
   updateProposalStatus,
   updateProposal,
 } = require("../controllers/proposalController");
+
 const { protect, restrictTo } = require("../middleware/auth");
 const {
   validateProposalCreate,
@@ -15,18 +16,15 @@ const {
   validateProposalUpdate,
 } = require("../middleware/validate");
 
-// Middleware to map projectId from params into body for validation/handler
+// Set projectId from params
 const setProjectIdFromParams = (req, res, next) => {
-  if (req.params.projectId) {
-    req.body.projectId = req.params.projectId;
-  }
+  if (req.params.projectId) req.body.projectId = req.params.projectId;
   next();
 };
 
-// All proposal routes require authentication
 router.use(protect);
 
-// Engineer: submit proposal (preferred: projectId in path)
+// Engineer routes
 router.post(
   "/project/:projectId",
   restrictTo("engineer"),
@@ -34,21 +32,14 @@ router.post(
   validateProposalCreate,
   createProposal
 );
-
-// (Legacy) Engineer: submit proposal with projectId in body
 router.post("/", restrictTo("engineer"), validateProposalCreate, createProposal);
-
-// Engineer: my proposals
 router.get("/my", restrictTo("engineer"), getMyProposals);
 
-// Project proposals (admin and project owner see all, engineer sees own - handled in controller)
+// Project proposals
 router.get("/project/:projectId", getProposalsByProject);
 
-// Update proposal (admin anytime, engineer within 1 hour)
+// Update proposals
 router.put("/:id", restrictTo("admin", "engineer"), validateProposalUpdate, updateProposal);
-
-// Admin: update proposal status
 router.put("/:id/status", restrictTo("admin"), validateProposalStatusUpdate, updateProposalStatus);
 
 module.exports = router;
-

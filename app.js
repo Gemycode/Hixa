@@ -72,21 +72,18 @@ app.use(compression());
 
 if (process.env.NODE_ENV === 'development') app.use(morgan('dev'));
 
-const API_PREFIX = '/api/v1';
-app.use(`${API_PREFIX}/auth`, authRoutes);
-app.use(`${API_PREFIX}/content`, contentRoutes);
-app.use(`${API_PREFIX}/users`, userRoutes);
-app.use(`${API_PREFIX}/subscribers`, subscriberRoutes);
-app.use(`${API_PREFIX}/projects`, projectRoutes);
-app.use(`${API_PREFIX}/portfolio`, portfolioRoutes);
-app.use(`${API_PREFIX}/service-orders`, serviceOrderRoutes);
-app.use(`${API_PREFIX}/proposals`, proposalRoutes);
-app.use(`${API_PREFIX}/project-rooms`, projectRoomRoutes);
-app.use(`${API_PREFIX}/chat-rooms`, chatRoomRoutes);
-app.use(`${API_PREFIX}/messages`, messageRoutes);
-
-app.use('/api/auth', authRoutes);
-app.use('/api/portfolio', portfolioRoutes);
+const API_PREFIX = '/api/';
+app.use(`${API_PREFIX}auth`, authRoutes);
+app.use(`${API_PREFIX}content`, contentRoutes);
+app.use(`${API_PREFIX}users`, userRoutes);
+app.use(`${API_PREFIX}subscribers`, subscriberRoutes);
+app.use(`${API_PREFIX}projects`, projectRoutes);
+app.use(`${API_PREFIX}portfolio`, portfolioRoutes);
+app.use(`${API_PREFIX}service-orders`, serviceOrderRoutes);
+app.use(`${API_PREFIX}proposals`, proposalRoutes);
+app.use(`${API_PREFIX}project-rooms`, projectRoomRoutes);
+app.use(`${API_PREFIX}chat-rooms`, chatRoomRoutes);
+app.use(`${API_PREFIX}messages`, messageRoutes);
 
 app.get("/", (req, res) => res.send("HIXA API is running"));
 

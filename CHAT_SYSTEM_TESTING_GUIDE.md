@@ -2,7 +2,7 @@
 
 ## 📌 معلومات أساسية
 
-**Base URL**: `https://hixa.onrender.com/api/v1` أو `http://localhost:5000/api/v1`
+**Base URL**: `https://hixa.onrender.com/api` أو `http://localhost:5000/api`
 
 **جميع المسارات محمية**: تحتاج `Authorization: Bearer YOUR_TOKEN_HERE`
 
@@ -33,7 +33,7 @@
 
 ### 1.1 جلب جميع غرف الدردشة الخاصة بي
 ```
-GET /api/v1/chat-rooms
+GET /api/chat-rooms
 ```
 
 **Headers:**
@@ -62,7 +62,7 @@ Authorization: Bearer YOUR_TOKEN_HERE
 
 ### 1.2 جلب غرف الدردشة الخاصة بمشروع معين
 ```
-GET /api/v1/chat-rooms/project-room/:projectRoomId
+GET /api/chat-rooms/project-room/:projectRoomId
 ```
 
 **Headers:**
@@ -72,7 +72,7 @@ Authorization: Bearer YOUR_TOKEN_HERE
 
 **Example:**
 ```
-GET /api/v1/chat-rooms/project-room/507f1f77bcf86cd799439013
+GET /api/chat-rooms/project-room/507f1f77bcf86cd799439013
 ```
 
 **Response (200):**
@@ -110,7 +110,7 @@ GET /api/v1/chat-rooms/project-room/507f1f77bcf86cd799439013
 
 ### 1.3 جلب غرفة دردشة معينة
 ```
-GET /api/v1/chat-rooms/:chatRoomId
+GET /api/chat-rooms/:chatRoomId
 ```
 
 **Headers:**
@@ -120,7 +120,7 @@ Authorization: Bearer YOUR_TOKEN_HERE
 
 **Example:**
 ```
-GET /api/v1/chat-rooms/507f1f77bcf86cd799439011
+GET /api/chat-rooms/507f1f77bcf86cd799439011
 ```
 
 **Response (200):**
@@ -148,7 +148,7 @@ GET /api/v1/chat-rooms/507f1f77bcf86cd799439011
 
 ### 1.4 إنشاء غرفة دردشة جديدة (Admin فقط)
 ```
-POST /api/v1/chat-rooms
+POST /api/chat-rooms
 ```
 
 **Headers:**
@@ -197,7 +197,7 @@ Content-Type: application/json
 
 #### أ) رسالة نصية فقط
 ```
-POST /api/v1/messages
+POST /api/messages
 ```
 
 **Headers:**
@@ -247,7 +247,7 @@ Content-Type: application/json
 
 #### ب) رسالة مع مرفقات (ملفات)
 ```
-POST /api/v1/messages
+POST /api/messages
 ```
 
 **Headers:**
@@ -268,7 +268,7 @@ Content-Type: multipart/form-data
 
 #### ج) الرد على رسالة
 ```
-POST /api/v1/messages
+POST /api/messages
 ```
 
 **Headers:**
@@ -309,7 +309,7 @@ Content-Type: application/json
 
 ### 2.2 جلب رسائل غرفة معينة
 ```
-GET /api/v1/messages/room/:chatRoomId?page=1&limit=20
+GET /api/messages/room/:chatRoomId?page=1&limit=20
 ```
 
 **Headers:**
@@ -323,7 +323,7 @@ Authorization: Bearer YOUR_TOKEN_HERE
 
 **Example:**
 ```
-GET /api/v1/messages/room/507f1f77bcf86cd799439011?page=1&limit=20
+GET /api/messages/room/507f1f77bcf86cd799439011?page=1&limit=20
 ```
 
 **Response (200):**
@@ -364,7 +364,7 @@ GET /api/v1/messages/room/507f1f77bcf86cd799439011?page=1&limit=20
 
 ### 2.3 تحديد رسالة كمقروءة
 ```
-PATCH /api/v1/messages/:messageId/read
+PATCH /api/messages/:messageId/read
 ```
 
 **Headers:**
@@ -374,7 +374,7 @@ Authorization: Bearer YOUR_TOKEN_HERE
 
 **Example:**
 ```
-PATCH /api/v1/messages/507f1f77bcf86cd799439020/read
+PATCH /api/messages/507f1f77bcf86cd799439020/read
 ```
 
 **Response (200):**
@@ -388,7 +388,7 @@ PATCH /api/v1/messages/507f1f77bcf86cd799439020/read
 
 ### 2.4 جلب عدد الرسائل غير المقروءة
 ```
-GET /api/v1/messages/unread/count
+GET /api/messages/unread/count
 ```
 
 **Headers:**
@@ -419,7 +419,7 @@ Authorization: Bearer YOUR_TOKEN_HERE
 
 ### 2.5 تعديل رسالة
 ```
-PUT /api/v1/messages/:messageId
+PUT /api/messages/:messageId
 ```
 
 **Headers:**
@@ -437,7 +437,7 @@ Content-Type: application/json
 
 **Example:**
 ```
-PUT /api/v1/messages/507f1f77bcf86cd799439020
+PUT /api/messages/507f1f77bcf86cd799439020
 ```
 
 **Response (200):**
@@ -459,7 +459,7 @@ PUT /api/v1/messages/507f1f77bcf86cd799439020
 
 ### 2.6 حذف رسالة
 ```
-DELETE /api/v1/messages/:messageId
+DELETE /api/messages/:messageId
 ```
 
 **Headers:**
@@ -469,7 +469,7 @@ Authorization: Bearer YOUR_TOKEN_HERE
 
 **Example:**
 ```
-DELETE /api/v1/messages/507f1f77bcf86cd799439020
+DELETE /api/messages/507f1f77bcf86cd799439020
 ```
 
 **Response (200):**
@@ -488,7 +488,7 @@ DELETE /api/v1/messages/507f1f77bcf86cd799439020
 
 ### 2.7 إضافة/إزالة تفاعل (Reaction)
 ```
-POST /api/v1/messages/:messageId/reaction
+POST /api/messages/:messageId/reaction
 ```
 
 **Headers:**
@@ -506,7 +506,7 @@ Content-Type: application/json
 
 **Example:**
 ```
-POST /api/v1/messages/507f1f77bcf86cd799439020/reaction
+POST /api/messages/507f1f77bcf86cd799439020/reaction
 ```
 
 **Response (200):**
@@ -535,7 +535,7 @@ POST /api/v1/messages/507f1f77bcf86cd799439020/reaction
 
 ### 2.8 البحث في الرسائل
 ```
-GET /api/v1/messages/search?roomId=507f1f77bcf86cd799439011&query=نص البحث&page=1&limit=20
+GET /api/messages/search?roomId=507f1f77bcf86cd799439011&query=نص البحث&page=1&limit=20
 ```
 
 **Headers:**
@@ -551,7 +551,7 @@ Authorization: Bearer YOUR_TOKEN_HERE
 
 **Example:**
 ```
-GET /api/v1/messages/search?roomId=507f1f77bcf86cd799439011&query=مرحباً&page=1&limit=20
+GET /api/messages/search?roomId=507f1f77bcf86cd799439011&query=مرحباً&page=1&limit=20
 ```
 
 **Response (200):**
@@ -582,7 +582,7 @@ GET /api/v1/messages/search?roomId=507f1f77bcf86cd799439011&query=مرحباً&p
 
 #### الخطوة 1: تسجيل الدخول
 ```http
-POST /api/v1/auth/login
+POST /api/auth/login
 {
   "email": "admin@example.com",
   "password": "Admin123"
@@ -594,7 +594,7 @@ POST /api/v1/auth/login
 
 #### الخطوة 2: جلب غرف الدردشة الخاصة بي
 ```http
-GET /api/v1/chat-rooms
+GET /api/chat-rooms
 Authorization: Bearer YOUR_TOKEN
 ```
 
@@ -604,7 +604,7 @@ Authorization: Bearer YOUR_TOKEN
 
 #### الخطوة 3: إنشاء غرفة دردشة (Admin فقط)
 ```http
-POST /api/v1/chat-rooms
+POST /api/chat-rooms
 Authorization: Bearer ADMIN_TOKEN
 Content-Type: application/json
 
@@ -621,7 +621,7 @@ Content-Type: application/json
 
 #### الخطوة 4: إرسال رسالة نصية
 ```http
-POST /api/v1/messages
+POST /api/messages
 Authorization: Bearer YOUR_TOKEN
 Content-Type: application/json
 
@@ -637,7 +637,7 @@ Content-Type: application/json
 
 #### الخطوة 5: جلب الرسائل
 ```http
-GET /api/v1/messages/room/507f1f77bcf86cd799439011
+GET /api/messages/room/507f1f77bcf86cd799439011
 Authorization: Bearer YOUR_TOKEN
 ```
 
@@ -645,7 +645,7 @@ Authorization: Bearer YOUR_TOKEN
 
 #### الخطوة 6: تحديد رسالة كمقروءة
 ```http
-PATCH /api/v1/messages/507f1f77bcf86cd799439020/read
+PATCH /api/messages/507f1f77bcf86cd799439020/read
 Authorization: Bearer YOUR_TOKEN
 ```
 
@@ -653,7 +653,7 @@ Authorization: Bearer YOUR_TOKEN
 
 #### الخطوة 7: إضافة تفاعل
 ```http
-POST /api/v1/messages/507f1f77bcf86cd799439020/reaction
+POST /api/messages/507f1f77bcf86cd799439020/reaction
 Authorization: Bearer YOUR_TOKEN
 Content-Type: application/json
 
@@ -666,7 +666,7 @@ Content-Type: application/json
 
 #### الخطوة 8: تعديل الرسالة
 ```http
-PUT /api/v1/messages/507f1f77bcf86cd799439020
+PUT /api/messages/507f1f77bcf86cd799439020
 Authorization: Bearer YOUR_TOKEN
 Content-Type: application/json
 
@@ -679,7 +679,7 @@ Content-Type: application/json
 
 #### الخطوة 9: البحث في الرسائل
 ```http
-GET /api/v1/messages/search?roomId=507f1f77bcf86cd799439011&query=مرحباً
+GET /api/messages/search?roomId=507f1f77bcf86cd799439011&query=مرحباً
 Authorization: Bearer YOUR_TOKEN
 ```
 
@@ -687,7 +687,7 @@ Authorization: Bearer YOUR_TOKEN
 
 #### الخطوة 10: حذف الرسالة
 ```http
-DELETE /api/v1/messages/507f1f77bcf86cd799439020
+DELETE /api/messages/507f1f77bcf86cd799439020
 Authorization: Bearer YOUR_TOKEN
 ```
 
@@ -697,7 +697,7 @@ Authorization: Bearer YOUR_TOKEN
 
 #### الخطوة 1: إرسال رسالة مع ملف مرفق
 ```http
-POST /api/v1/messages
+POST /api/messages
 Authorization: Bearer YOUR_TOKEN
 Content-Type: multipart/form-data
 
@@ -713,7 +713,7 @@ attachments: [اختيار ملف - صورة أو PDF]
 
 #### الخطوة 1: إرسال رسالة رد
 ```http
-POST /api/v1/messages
+POST /api/messages
 Authorization: Bearer YOUR_TOKEN
 Content-Type: application/json
 

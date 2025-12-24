@@ -2,7 +2,7 @@
 
 ## 📌 معلومات أساسية
 
-**Base URL**: `http://localhost:5000/api/v1` (أو أي port/domain تستخدمينه)
+**Base URL**: `http://localhost:5000/api` أو `https://hixa.onrender.com/api` (أو أي port/domain تستخدمينه)
 
 **Content-Type**: `application/json`
 
@@ -12,7 +12,7 @@
 
 ### 1.1 تسجيل مستخدم جديد
 ```
-POST /api/v1/auth/register
+POST /api/auth/register
 ```
 
 **Headers:**
@@ -47,7 +47,7 @@ Content-Type: application/json
 
 ### 1.2 تسجيل الدخول
 ```
-POST /api/v1/auth/login
+POST /api/auth/login
 ```
 
 **Body:**
@@ -73,7 +73,7 @@ POST /api/v1/auth/login
 
 ### 2.1 جلب الملف الشخصي
 ```
-GET /api/v1/users/me
+GET /api/users/me
 ```
 
 **Headers:**
@@ -85,7 +85,7 @@ Authorization: Bearer YOUR_TOKEN_HERE
 
 ### 2.2 تحديث الملف الشخصي
 ```
-PUT /api/v1/users/me
+PUT /api/users/me
 ```
 
 **Headers:**
@@ -105,7 +105,7 @@ Content-Type: multipart/form-data
 
 ### 2.3 تغيير كلمة المرور
 ```
-PUT /api/v1/users/me/change-password
+PUT /api/users/me/change-password
 ```
 
 **Headers:**
@@ -127,7 +127,7 @@ Content-Type: application/json
 
 ### 2.4 جلب جميع المستخدمين (Admin فقط)
 ```
-GET /api/v1/users?page=1&limit=10&role=engineer&search=test
+GET /api/users?page=1&limit=10&role=engineer&search=test
 ```
 
 **Query Parameters:**
@@ -146,7 +146,7 @@ Authorization: Bearer ADMIN_TOKEN_HERE
 
 ### 2.5 إنشاء مستخدم جديد (Admin فقط)
 ```
-POST /api/v1/users
+POST /api/users
 ```
 
 **Headers:**
@@ -171,7 +171,7 @@ Content-Type: application/json
 
 ### 2.6 تفعيل/إلغاء تفعيل مستخدم (Admin فقط)
 ```
-PATCH /api/v1/users/:id/toggle-activation
+PATCH /api/users/:id/toggle-activation
 ```
 
 **Headers:**
@@ -187,7 +187,7 @@ Authorization: Bearer ADMIN_TOKEN_HERE
 
 #### 3.1.1 جلب غرف الشات الخاصة بي
 ```
-GET /api/v1/chat-rooms
+GET /api/chat-rooms
 ```
 
 **Headers:**
@@ -199,7 +199,7 @@ Authorization: Bearer YOUR_TOKEN_HERE
 
 #### 3.1.2 جلب غرف الشات الخاصة بمشروع معين
 ```
-GET /api/v1/chat-rooms/project-room/:projectRoomId
+GET /api/chat-rooms/project-room/:projectRoomId
 ```
 
 **Headers:**
@@ -209,14 +209,14 @@ Authorization: Bearer YOUR_TOKEN_HERE
 
 **Example:**
 ```
-GET /api/v1/chat-rooms/project-room/507f1f77bcf86cd799439011
+GET /api/chat-rooms/project-room/507f1f77bcf86cd799439011
 ```
 
 ---
 
 #### 3.1.3 جلب غرفة شات معينة
 ```
-GET /api/v1/chat-rooms/:roomId
+GET /api/chat-rooms/:roomId
 ```
 
 **Headers:**
@@ -228,7 +228,7 @@ Authorization: Bearer YOUR_TOKEN_HERE
 
 #### 3.1.4 إنشاء غرفة شات جديدة (Admin فقط)
 ```
-POST /api/v1/chat-rooms
+POST /api/chat-rooms
 ```
 
 **Headers:**
@@ -258,7 +258,7 @@ Content-Type: application/json
 
 #### 3.2.1 إرسال رسالة جديدة
 ```
-POST /api/v1/messages
+POST /api/messages
 ```
 
 **Headers:**
@@ -282,7 +282,7 @@ Content-Type: multipart/form-data
 
 **Example (JSON - بدون ملفات):**
 ```
-POST /api/v1/messages
+POST /api/messages
 Content-Type: application/json
 ```
 
@@ -298,7 +298,7 @@ Content-Type: application/json
 
 #### 3.2.2 جلب رسائل غرفة معينة
 ```
-GET /api/v1/messages/room/:roomId?page=1&limit=20
+GET /api/messages/room/:roomId?page=1&limit=20
 ```
 
 **Headers:**
@@ -312,14 +312,14 @@ Authorization: Bearer YOUR_TOKEN_HERE
 
 **Example:**
 ```
-GET /api/v1/messages/room/507f1f77bcf86cd799439011?page=1&limit=20
+GET /api/messages/room/507f1f77bcf86cd799439011?page=1&limit=20
 ```
 
 ---
 
 #### 3.2.3 تحديد رسالة كمقروءة
 ```
-PATCH /api/v1/messages/:messageId/read
+PATCH /api/messages/:messageId/read
 ```
 
 **Headers:**
@@ -329,14 +329,14 @@ Authorization: Bearer YOUR_TOKEN_HERE
 
 **Example:**
 ```
-PATCH /api/v1/messages/507f1f77bcf86cd799439014/read
+PATCH /api/messages/507f1f77bcf86cd799439014/read
 ```
 
 ---
 
 #### 3.2.4 جلب عدد الرسائل غير المقروءة
 ```
-GET /api/v1/messages/unread/count
+GET /api/messages/unread/count
 ```
 
 **Headers:**
@@ -367,7 +367,7 @@ Authorization: Bearer YOUR_TOKEN_HERE
 
 #### 3.2.5 تعديل رسالة
 ```
-PUT /api/v1/messages/:messageId
+PUT /api/messages/:messageId
 ```
 
 **Headers:**
@@ -389,7 +389,7 @@ Content-Type: application/json
 
 #### 3.2.6 حذف رسالة
 ```
-DELETE /api/v1/messages/:messageId
+DELETE /api/messages/:messageId
 ```
 
 **Headers:**
@@ -403,7 +403,7 @@ Authorization: Bearer YOUR_TOKEN_HERE
 
 #### 3.2.7 إضافة/إزالة تفاعل (Reaction)
 ```
-POST /api/v1/messages/:messageId/reaction
+POST /api/messages/:messageId/reaction
 ```
 
 **Headers:**
@@ -427,7 +427,7 @@ Content-Type: application/json
 
 #### 3.2.8 البحث في الرسائل
 ```
-GET /api/v1/messages/search?roomId=507f1f77bcf86cd799439011&query=نص البحث&page=1&limit=20
+GET /api/messages/search?roomId=507f1f77bcf86cd799439011&query=نص البحث&page=1&limit=20
 ```
 
 **Headers:**
@@ -499,7 +499,7 @@ Authorization: Bearer YOUR_TOKEN_HERE
 ### في Postman/API Dog:
 
 1. **إنشاء Environment**:
-   - `base_url`: `http://localhost:5000/api/v1`
+   - `base_url`: `http://localhost:5000/api`
    - `token`: سيتم تحديثه تلقائياً
 
 2. **استخدام Variables**:

@@ -5,7 +5,9 @@ const User = require('@models/userModel');
 class WebSocketServer {
   constructor(server) {
     this.wss = new WebSocket.Server({ server });
-    this.clients = new Map();
+    this.clients = new Map(); // userId -> ws connection
+    this.roomMembers = new Map(); // roomId -> Set of userIds
+    this.userRooms = new Map(); // userId -> Set of roomIds
     this.setupConnection();
   }
 
@@ -27,7 +29,8 @@ class WebSocketServer {
         }
 
         // تخزين الاتصال بالمستخدم
-        this.clients.set(user._id.toString(), ws);
+        const userId = user._id.toString();
+        this.clients.set(userId, ws);
 
         // إرسال رسالة ترحيب
         this.sendToUser(user._id, {
@@ -43,7 +46,21 @@ class WebSocketServer {
 
         // إغلاق الاتصال
         ws.on('close', () => {
-          this.clients.delete(user._id.toString());
+          this.clients.delete(userId);
+          // Remove user from all rooms
+          const userRoomSet = this.userRooms.get(userId);
+          if (userRoomSet) {
+            userRoomSet.forEach(roomId => {
+              const roomMembers = this.roomMembers.get(roomId);
+              if (roomMembers) {
+                roomMembers.delete(userId);
+                if (roomMembers.size === 0) {
+                  this.roomMembers.delete(roomId);
+                }
+              }
+            });
+            this.userRooms.delete(userId);
+          }
         });
 
       } catch (error) {
@@ -58,6 +75,24 @@ class WebSocketServer {
       const data = JSON.parse(message);
       
       switch (data.type) {
+        case 'join_room':
+          if (data.roomId) {
+            this.joinRoom(user._id, data.roomId);
+            this.sendToUser(user._id, {
+              type: 'joined_room',
+              roomId: data.roomId,
+            });
+          }
+          break;
+        case 'leave_room':
+          if (data.roomId) {
+            this.leaveRoom(user._id, data.roomId);
+            this.sendToUser(user._id, {
+              type: 'left_room',
+              roomId: data.roomId,
+            });
+          }
+          break;
         case 'message':
           this.handleChatMessage(user, data);
           break;
@@ -95,14 +130,67 @@ class WebSocketServer {
 
   handleTyping(user, data) {
     const { chatRoomId, isTyping } = data;
+    if (!chatRoomId) return;
+    
     // إرسال إشعار الكتابة إلى المشاركين الآخرين في الغرفة
-    // ...
+    this.broadcastToRoom(chatRoomId, {
+      type: 'user_typing',
+      userId: user._id,
+      userName: user.name,
+      isTyping,
+      chatRoomId,
+    }, user._id.toString());
   }
 
   handleReadReceipt(user, data) {
     const { messageIds, chatRoomId } = data;
-    // تحديث حالة القراءة للرسائل
-    // ...
+    // إشعار المشاركين الآخرين أن المستخدم قرأ الرسائل
+    if (chatRoomId) {
+      this.broadcastToRoom(chatRoomId, {
+        type: 'messages_read',
+        userId: user._id,
+        messageIds,
+        chatRoomId,
+      }, user._id.toString());
+    }
+  }
+
+  // Join a room
+  joinRoom(userId, roomId) {
+    const userIdStr = userId.toString();
+    const roomIdStr = roomId.toString();
+    
+    if (!this.roomMembers.has(roomIdStr)) {
+      this.roomMembers.set(roomIdStr, new Set());
+    }
+    this.roomMembers.get(roomIdStr).add(userIdStr);
+    
+    if (!this.userRooms.has(userIdStr)) {
+      this.userRooms.set(userIdStr, new Set());
+    }
+    this.userRooms.get(userIdStr).add(roomIdStr);
+  }
+
+  // Leave a room
+  leaveRoom(userId, roomId) {
+    const userIdStr = userId.toString();
+    const roomIdStr = roomId.toString();
+    
+    const roomMembers = this.roomMembers.get(roomIdStr);
+    if (roomMembers) {
+      roomMembers.delete(userIdStr);
+      if (roomMembers.size === 0) {
+        this.roomMembers.delete(roomIdStr);
+      }
+    }
+    
+    const userRoomSet = this.userRooms.get(userIdStr);
+    if (userRoomSet) {
+      userRoomSet.delete(roomIdStr);
+      if (userRoomSet.size === 0) {
+        this.userRooms.delete(userIdStr);
+      }
+    }
   }
 
   sendToUser(userId, message) {
@@ -113,9 +201,55 @@ class WebSocketServer {
   }
 
   broadcastToRoom(roomId, message, excludeUserId = null) {
-    // إرسال رسالة لجميع المشاركين في الغرفة
-    // ...
+    const roomIdStr = roomId.toString();
+    const roomMembers = this.roomMembers.get(roomIdStr);
+    
+    if (!roomMembers || roomMembers.size === 0) {
+      return;
+    }
+
+    const messageStr = JSON.stringify(message);
+    let sentCount = 0;
+
+    roomMembers.forEach(userId => {
+      if (excludeUserId && userId === excludeUserId.toString()) {
+        return; // Skip excluded user
+      }
+
+      const client = this.clients.get(userId);
+      if (client && client.readyState === WebSocket.OPEN) {
+        try {
+          client.send(messageStr);
+          sentCount++;
+        } catch (error) {
+          console.error(`Error sending message to user ${userId}:`, error);
+        }
+      }
+    });
+
+    return sentCount;
   }
 }
 
+// Singleton instance
+let wssInstance = null;
+
+// Initialize WebSocket server
+const initWebSocketServer = (server) => {
+  if (!wssInstance) {
+    wssInstance = new WebSocketServer(server);
+  }
+  return wssInstance;
+};
+
+// Get WebSocket server instance
+const getWebSocketServer = () => {
+  if (!wssInstance) {
+    throw new Error('WebSocket server not initialized. Call initWebSocketServer first.');
+  }
+  return wssInstance;
+};
+
 module.exports = WebSocketServer;
+module.exports.initWebSocketServer = initWebSocketServer;
+module.exports.getWebSocketServer = getWebSocketServer;

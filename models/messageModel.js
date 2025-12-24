@@ -14,7 +14,9 @@ const MessageSchema = new mongoose.Schema(
     },
     content: {
       type: String,
-      required: true,
+      required: function() {
+        return this.type === 'text' || this.type === 'system';
+      },
       trim: true,
       maxlength: 5000,
     },
@@ -42,6 +44,36 @@ const MessageSchema = new mongoose.Schema(
         },
       },
     ],
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Message",
+    },
+    reactions: [
+      {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        emoji: {
+          type: String,
+          required: true,
+        },
+      },
+    ],
+    isEdited: {
+      type: Boolean,
+      default: false,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    deletedAt: Date,
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
   },
   { timestamps: true }
 );
@@ -50,5 +82,16 @@ const MessageSchema = new mongoose.Schema(
 MessageSchema.index({ chatRoom: 1, createdAt: -1 });
 MessageSchema.index({ sender: 1, createdAt: -1 });
 MessageSchema.index({ "readBy.user": 1 });
+MessageSchema.index({ replyTo: 1 });
+MessageSchema.index({ "reactions.user": 1 });
+MessageSchema.index({ isDeleted: 1 });
+
+// Pre-save hook to update isEdited
+MessageSchema.pre("save", function (next) {
+  if (this.isModified("content") && !this.isNew) {
+    this.isEdited = true;
+  }
+  next();
+});
 
 module.exports = mongoose.models.Message || mongoose.model("Message", MessageSchema);

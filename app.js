@@ -31,8 +31,8 @@ const messageRoutes = require('@routes/messageRoutes');
 const app = express();
 const server = http.createServer(app);
 
-const WebSocketServer = require('@websocket/websocket');
-const wss = new WebSocketServer(server);
+const { initWebSocketServer } = require('@websocket/websocket');
+const wss = initWebSocketServer(server);
 
 const cache = new NodeCache({ stdTTL: 600 });
 app.set('cache', cache);

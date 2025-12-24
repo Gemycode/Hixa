@@ -24,6 +24,12 @@ const sanitizeProject = (project) => {
     proposalsCount: projectObj.proposalsCount || 0,
     isActive: projectObj.isActive,
     tags: projectObj.tags || [],
+    adminApproval: projectObj.adminApproval || {
+      status: "pending",
+      reviewedBy: null,
+      reviewedAt: null,
+      rejectionReason: null,
+    },
     createdAt: projectObj.createdAt,
     updatedAt: projectObj.updatedAt,
   };
@@ -45,6 +51,7 @@ exports.createProject = async (req, res, next) => {
     } = req.body;
 
     // Client can only create projects for themselves
+    // المشروع يبدأ في حالة "Pending Review" وينتظر موافقة الأدمن
     const project = await Project.create({
       title,
       description,
@@ -56,7 +63,10 @@ exports.createProject = async (req, res, next) => {
       budget: budget || {},
       deadline: deadline ? new Date(deadline) : undefined,
       tags: tags || [],
-      status: "Draft", // New projects start as Draft
+      status: "Pending Review", // يبدأ في انتظار مراجعة الأدمن
+      adminApproval: {
+        status: "pending", // في انتظار المراجعة
+      },
     });
 
     res.status(201).json({
@@ -119,10 +129,21 @@ exports.getProjects = async (req, res, next) => {
     // Only show active projects
     filters.isActive = true;
 
+    // Clients see all their projects (including rejected)
+    // Engineers and Admin only see approved projects (unless filtering by status)
+    if (req.user.role !== "client" && !status) {
+      filters["adminApproval.status"] = "approved";
+      filters.status = { $ne: "Rejected" }; // لا تظهر المشاريع المرفوضة
+    } else if (req.user.role === "client" && !status) {
+      // Clients can see their pending, approved, and rejected projects
+      // No filter needed
+    }
+
     const [projects, total] = await Promise.all([
       Project.find(filters)
         .populate("client", "name email")
         .populate("assignedEngineer", "name email")
+        .populate("adminApproval.reviewedBy", "name email")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
@@ -148,7 +169,8 @@ exports.getProjectById = async (req, res, next) => {
   try {
     const project = await Project.findById(req.params.id)
       .populate("client", "name email")
-      .populate("assignedEngineer", "name email");
+      .populate("assignedEngineer", "name email")
+      .populate("adminApproval.reviewedBy", "name email");
 
     if (!project) {
       return res.status(404).json({ message: "المشروع غير موجود" });
@@ -492,6 +514,112 @@ exports.deleteAttachment = async (req, res, next) => {
 
     res.json({
       message: "تم حذف الملف بنجاح",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Approve project (Admin only)
+exports.approveProject = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const project = await Project.findById(id);
+
+    if (!project) {
+      return res.status(404).json({ message: "المشروع غير موجود" });
+    }
+
+    if (project.adminApproval.status === "approved") {
+      return res.status(400).json({ message: "تم الموافقة على هذا المشروع بالفعل" });
+    }
+
+    // Update admin approval
+    project.adminApproval.status = "approved";
+    project.adminApproval.reviewedBy = req.user._id;
+    project.adminApproval.reviewedAt = new Date();
+    project.status = "Waiting for Engineers"; // بعد الموافقة، ينتظر المهندسين
+
+    await project.save();
+
+    res.json({
+      message: "تم الموافقة على المشروع بنجاح",
+      data: sanitizeProject(project),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Reject project (Admin only)
+exports.rejectProject = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { rejectionReason } = req.body;
+
+    if (!rejectionReason || rejectionReason.trim().length === 0) {
+      return res.status(400).json({ message: "يجب إضافة سبب الرفض" });
+    }
+
+    const project = await Project.findById(id);
+
+    if (!project) {
+      return res.status(404).json({ message: "المشروع غير موجود" });
+    }
+
+    if (project.adminApproval.status === "rejected") {
+      return res.status(400).json({ message: "تم رفض هذا المشروع بالفعل" });
+    }
+
+    // Update admin approval
+    project.adminApproval.status = "rejected";
+    project.adminApproval.reviewedBy = req.user._id;
+    project.adminApproval.reviewedAt = new Date();
+    project.adminApproval.rejectionReason = rejectionReason.trim();
+    project.status = "Rejected"; // رفض المشروع
+
+    await project.save();
+
+    res.json({
+      message: "تم رفض المشروع",
+      data: sanitizeProject(project),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get pending projects for admin review
+exports.getPendingProjects = async (req, res, next) => {
+  try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
+    const skip = (page - 1) * limit;
+
+    const filters = {
+      "adminApproval.status": "pending",
+      status: "Pending Review",
+      isActive: true,
+    };
+
+    const [projects, total] = await Promise.all([
+      Project.find(filters)
+        .populate("client", "name email")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Project.countDocuments(filters),
+    ]);
+
+    res.json({
+      data: projects.map(sanitizeProject),
+      meta: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit) || 1,
+      },
     });
   } catch (error) {
     next(error);

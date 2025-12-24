@@ -64,8 +64,9 @@ const ProjectSchema = new mongoose.Schema(
         "In Progress", // قيد التنفيذ
         "Completed", // مكتمل
         "Cancelled", // ملغي
+        "Rejected", // مرفوض من الأدمن
       ],
-      default: "Draft",
+      default: "Pending Review", // يبدأ في انتظار المراجعة
     },
     budget: {
       amount: { type: Number, min: 0 },
@@ -97,6 +98,26 @@ const ProjectSchema = new mongoose.Schema(
         maxlength: 50,
       },
     ],
+    // نظام موافقة الأدمن
+    adminApproval: {
+      status: {
+        type: String,
+        enum: ["pending", "approved", "rejected"],
+        default: "pending",
+      },
+      reviewedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      reviewedAt: {
+        type: Date,
+      },
+      rejectionReason: {
+        type: String,
+        trim: true,
+        maxlength: 1000,
+      },
+    },
   },
   { timestamps: true }
 );
@@ -109,6 +130,7 @@ ProjectSchema.index({ status: 1 });
 ProjectSchema.index({ createdAt: -1 });
 ProjectSchema.index({ location: 1 });
 ProjectSchema.index({ category: 1 });
+ProjectSchema.index({ "adminApproval.status": 1, status: 1 }); // للبحث السريع عن المشاريع في انتظار المراجعة
 
 // Ensure virtuals are included in JSON
 ProjectSchema.set("toJSON", { virtuals: true });

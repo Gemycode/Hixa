@@ -8,7 +8,7 @@ const morgan = require('morgan');
 const http = require('http');
 const NodeCache = require('node-cache');
 const helmet = require('helmet');
-const mongoSanitize = require('express-mongo-sanitize');
+// Custom sanitization middleware will be used instead of express-mongo-sanitize
 const hpp = require('hpp');
 
 // Load environment variables
@@ -76,8 +76,46 @@ app.use(cors({
 // Apply rate limiting to API routes
 app.use("/api", apiLimiter);
 
-// Data sanitization against NoSQL injection
-app.use(mongoSanitize());
+// Custom NoSQL injection protection
+app.use((req, res, next) => {
+  try {
+    // Skip WebSocket upgrade requests
+    if (req.headers.upgrade === 'websocket') {
+      return next();
+    }
+
+    // Sanitize query parameters
+    if (req.query) {
+      const sanitizedQuery = {};
+      for (const [key, value] of Object.entries(req.query)) {
+        // Ignore any key that starts with $
+        if (!key.startsWith('$')) {
+          sanitizedQuery[key] = value;
+        }
+      }
+      // Replace the query object with our sanitized version
+      req.query = sanitizedQuery;
+    }
+
+    // Sanitize request body
+    if (req.body && typeof req.body === 'object') {
+      const sanitizedBody = {};
+      for (const [key, value] of Object.entries(req.body)) {
+        // Ignore any key that starts with $
+        if (!key.startsWith('$')) {
+          sanitizedBody[key] = value;
+        }
+      }
+      // Replace the body with our sanitized version
+      req.body = sanitizedBody;
+    }
+
+    next();
+  } catch (error) {
+    console.error('Error in custom sanitization middleware:', error);
+    next();
+  }
+});
 
 // Prevent parameter pollution
 app.use(hpp({

@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
+// Import controllers
 const {
   createWork,
   getWorks,
@@ -8,21 +9,30 @@ const {
   getWorkById,
   updateWork,
   deleteWork,
-  getWorksByUser, 
+  getWorksByUser,
 } = require("../controllers/portfolioController");
+
+// Import middleware
 const { protect, engineerOrAdmin } = require("../middleware/auth");
 const { validateWork, validateWorkUpdate } = require("../middleware/validate");
 const { uploadFields } = require("../middleware/upload");
 
-// Public list and details
+// ====================
+// Public Routes
+// ====================
 router.get("/", getWorks);
 router.get("/category/:category", getWorksByCategory);
-router.get("/:id", getWorkById);
 router.get("/user/:userId", getWorksByUser);
-// Protected CRUD
+router.get("/:id", getWorkById);
+
+// ====================
+// Protected Routes
+// ====================
+router.use(protect); // Apply protect middleware to all routes below
+
+// Create work
 router.post(
   "/",
-  protect,
   engineerOrAdmin,
   uploadFields([
     { name: "image", maxCount: 1 },
@@ -32,9 +42,9 @@ router.post(
   createWork
 );
 
+// Update work
 router.put(
   "/:id",
-  protect,
   engineerOrAdmin,
   uploadFields([
     { name: "image", maxCount: 1 },
@@ -44,8 +54,8 @@ router.put(
   updateWork
 );
 
-router.delete("/:id", protect, engineerOrAdmin, deleteWork);
+// Delete work
+router.delete("/:id", engineerOrAdmin, deleteWork);
 
 module.exports = router;
-
 

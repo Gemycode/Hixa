@@ -35,6 +35,19 @@ exports.createProposal = async (req, res, next) => {
       return res.status(404).json({ message: "المشروع غير موجود" });
     }
 
+    // Check if project is approved and waiting for engineers
+    if (project.status !== "Waiting for Engineers") {
+      return res.status(400).json({ 
+        message: "لا يمكن تقديم عروض على هذا المشروع. يجب أن يكون المشروع موافقاً عليه و في انتظار المهندسين" 
+      });
+    }
+
+    if (project.adminApproval?.status !== "approved") {
+      return res.status(400).json({ 
+        message: "لا يمكن تقديم عروض على مشروع غير موافق عليه من الأدمن" 
+      });
+    }
+
     // Ensure no duplicate proposal for same project/engineer
     const existing = await Proposal.findOne({ project: projectId, engineer: req.user._id });
     if (existing) {
@@ -197,8 +210,8 @@ exports.getProposalsByProject = async (req, res, next) => {
 
     const proposals = await Proposal.find(filters)
       .sort({ createdAt: -1 })
-      .populate("engineer", "name email role")
-      .populate("project", "title client");
+      .populate("engineer", "name email role avatar")
+      .populate("project", "title client status adminApproval");
 
     res.json({
       data: proposals.map(sanitizeProposal),
@@ -217,7 +230,7 @@ exports.getMyProposals = async (req, res, next) => {
 
     const proposals = await Proposal.find({ engineer: req.user._id })
       .sort({ createdAt: -1 })
-      .populate("project", "title status assignedEngineer client");
+      .populate("project", "title status assignedEngineer client adminApproval");
 
     res.json({
       data: proposals.map(sanitizeProposal),
@@ -237,13 +250,132 @@ exports.updateProposalStatus = async (req, res, next) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const proposal = await Proposal.findById(id);
+    const proposal = await Proposal.findById(id).populate("project");
     if (!proposal) {
       return res.status(404).json({ message: "العرض غير موجود" });
     }
 
+    const project = proposal.project;
+    if (!project || !project.isActive) {
+      return res.status(404).json({ message: "المشروع المرتبط بالعرض غير موجود" });
+    }
+
+    const oldStatus = proposal.status;
     proposal.status = status;
     await proposal.save();
+
+    // If accepting proposal, update project and reject other proposals
+    if (status === "accepted" && oldStatus !== "accepted") {
+      // Update project: assign engineer and change status
+      project.assignedEngineer = proposal.engineer;
+      project.status = "In Progress";
+      await project.save();
+
+      // Reject all other proposals for this project
+      await Proposal.updateMany(
+        { 
+          project: proposal.project._id, 
+          _id: { $ne: proposal._id },
+          status: { $ne: "rejected" }
+        },
+        { status: "rejected" }
+      );
+
+      // Create/update group chat room
+      try {
+        const projectId = proposal.project._id || proposal.project;
+        let projectRoom = await ProjectRoom.findOne({ project: projectId });
+        
+        if (!projectRoom) {
+          projectRoom = await ProjectRoom.create({
+            project: projectId,
+            projectTitle: project.title,
+          });
+        }
+
+        // Check if Group ChatRoom already exists
+        let groupChatRoom = await ChatRoom.findOne({
+          project: projectId,
+          projectRoom: projectRoom._id,
+          type: "group",
+        });
+
+        if (!groupChatRoom) {
+          // Create Group ChatRoom
+          groupChatRoom = await ChatRoom.create({
+            project: projectId,
+            projectRoom: projectRoom._id,
+            type: "group",
+            participants: [
+              {
+                user: project.client,
+                role: "client",
+                joinedAt: new Date(),
+              },
+              {
+                user: proposal.engineer,
+                role: "engineer",
+                joinedAt: new Date(),
+              },
+            ],
+          });
+
+          // Send system message about acceptance
+          const systemMessage = await Message.create({
+            chatRoom: groupChatRoom._id,
+            sender: "system",
+            content: `تم قبول العرض وتم تعيين المهندس للمشروع "${project.title}". يمكنكم الآن التواصل مباشرة.`,
+            type: "system",
+          });
+          
+          // Update chat room's last message
+          groupChatRoom.lastMessage = {
+            content: systemMessage.content.substring(0, 100),
+            sender: "system",
+            createdAt: systemMessage.createdAt,
+          };
+          await groupChatRoom.save();
+          
+          // Update project room's last activity
+          projectRoom.lastActivityAt = systemMessage.createdAt;
+          await projectRoom.save();
+        } else {
+          // Ensure participants are in the group
+          const engineerExists = groupChatRoom.participants.some(
+            p => p.user.toString() === proposal.engineer.toString()
+          );
+
+          if (!engineerExists) {
+            groupChatRoom.participants.push({
+              user: proposal.engineer,
+              role: "engineer",
+              joinedAt: new Date(),
+            });
+            await groupChatRoom.save();
+
+            // Send system message about adding engineer
+            const systemMessage = await Message.create({
+              chatRoom: groupChatRoom._id,
+              sender: "system",
+              content: `تم قبول العرض وتم إضافة المهندس للمشروع "${project.title}".`,
+              type: "system",
+            });
+            
+            groupChatRoom.lastMessage = {
+              content: systemMessage.content.substring(0, 100),
+              sender: "system",
+              createdAt: systemMessage.createdAt,
+            };
+            await groupChatRoom.save();
+            
+            projectRoom.lastActivityAt = systemMessage.createdAt;
+            await projectRoom.save();
+          }
+        }
+      } catch (chatError) {
+        console.error("Error creating group chat room:", chatError);
+      }
+    }
 
     res.json({
       message: "تم تحديث حالة العرض",
@@ -299,6 +431,44 @@ exports.updateProposal = async (req, res, next) => {
     res.json({
       message: "تم تحديث العرض بنجاح",
       data: sanitizeProposal(proposal),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Delete proposal (engineer can delete own pending proposals, admin can delete any)
+exports.deleteProposal = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const proposal = await Proposal.findById(id).populate("project");
+    if (!proposal) {
+      return res.status(404).json({ message: "العرض غير موجود" });
+    }
+
+    const isAdmin = req.user.role === "admin";
+    const isOwner = proposal.engineer.toString() === req.user._id.toString();
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ message: "غير مسموح بحذف هذا العرض" });
+    }
+
+    // Engineer can only delete pending proposals
+    if (!isAdmin && proposal.status !== "pending") {
+      return res.status(403).json({ message: "لا يمكن حذف العرض إلا إذا كان في حالة انتظار" });
+    }
+
+    // Decrement project's proposals count
+    await Project.updateOne(
+      { _id: proposal.project._id || proposal.project }, 
+      { $inc: { proposalsCount: -1 } }
+    ).catch(() => {});
+
+    await Proposal.findByIdAndDelete(id);
+
+    res.json({
+      message: "تم حذف العرض بنجاح",
     });
   } catch (error) {
     next(error);

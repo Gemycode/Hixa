@@ -7,6 +7,7 @@ const {
   getMyProposals,
   updateProposalStatus,
   updateProposal,
+  deleteProposal,
 } = require("../controllers/proposalController");
 
 const { protect, restrictTo } = require("../middleware/auth");
@@ -41,5 +42,8 @@ router.get("/project/:projectId", getProposalsByProject);
 // Update proposals
 router.put("/:id", restrictTo("admin", "engineer"), validateProposalUpdate, updateProposal);
 router.put("/:id/status", restrictTo("admin"), validateProposalStatusUpdate, updateProposalStatus);
+
+// Delete proposal
+router.delete("/:id", restrictTo("admin", "engineer"), deleteProposal);
 
 module.exports = router;

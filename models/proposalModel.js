@@ -45,6 +45,8 @@ const ProposalSchema = new mongoose.Schema(
 // Each engineer can submit one proposal per project
 ProposalSchema.index({ project: 1, engineer: 1 }, { unique: true });
 ProposalSchema.index({ project: 1, status: 1, createdAt: -1 });
+ProposalSchema.index({ engineer: 1, status: 1 }); // للبحث السريع عن عروض المهندس
+ProposalSchema.index({ status: 1, createdAt: -1 }); // للبحث السريع حسب الحالة
 
 module.exports = mongoose.models.Proposal || mongoose.model("Proposal", ProposalSchema);
 

@@ -93,9 +93,10 @@ const validateLogin = (req, res, next) => {
     password: Joi.string().required().messages({
       "any.required": "كلمة المرور مطلوبة",
     }),
+    rememberMe: Joi.boolean().optional(), // حقل اختياري لتذكر تسجيل الدخول
   });
 
-  const { error } = schema.validate(req.body, { abortEarly: false });
+  const { error } = schema.validate(req.body, { abortEarly: false, allowUnknown: false });
   if (error) {
     const messages = error.details.map((detail) => detail.message).join(", ");
     return res.status(400).json({ message: messages });

@@ -168,7 +168,7 @@ const registerClient = async (req, res) => {
 
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body;
 
     const user = await User.findOne({ email }).select("+password");
     if (!user || !(await user.comparePassword(password))) {
@@ -177,7 +177,14 @@ const login = async (req, res) => {
 
     if (!user.isActive) return res.status(403).json({ message: "الحساب غير مفعّل" });
 
-    const token = generateToken(user._id, user.role);
+    // تحديد مدة صلاحية الـ token بناءً على rememberMe
+    const expiresIn = rememberMe ? process.env.JWT_EXPIRES_IN_LONG || "30d" : process.env.JWT_EXPIRES_IN || "1d";
+    const token = jwt.sign(
+      { sub: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn, issuer: "hixa-api" }
+    );
+    
     user.lastLogin = new Date();
     await user.save({ validateBeforeSave: false });
 

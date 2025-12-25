@@ -7,16 +7,21 @@ const {
   getProjectById,
   updateProject,
   deleteProject,
+  hardDeleteProject,
+  duplicateProject,
   uploadAttachment,
   deleteAttachment,
   getProjectStatistics,
   approveProject,
   rejectProject,
   getPendingProjects,
+  addProjectNote,
+  getProjectNotes,
+  deleteProjectNote,
 } = require("../controllers/projectController");
 
 const { protect, restrictTo } = require("../middleware/auth");
-const { validateProject, validateProjectUpdate } = require("../middleware/validate");
+const { validateProject, validateProjectUpdate, validateProjectNote } = require("../middleware/validate");
 const { uploadSingleFile } = require("../middleware/upload");
 
 // All routes require authentication
@@ -37,7 +42,9 @@ router.post("/", restrictTo("client"), validateProject, createProject);
 
 // Update/delete project
 router.put("/:id", validateProjectUpdate, updateProject);
-router.delete("/:id", deleteProject);
+router.delete("/:id", deleteProject); // Soft delete
+router.delete("/:id/hard", restrictTo("admin"), hardDeleteProject); // Hard delete (Admin only)
+router.post("/:id/duplicate", duplicateProject); // Duplicate project
 
 // Attachments
 router.post("/:id/attachments", uploadSingleFile("file"), uploadAttachment);
@@ -46,5 +53,10 @@ router.delete("/:id/attachments/:attachmentId", deleteAttachment);
 // Admin: Approve/Reject projects
 router.patch("/:id/approve", restrictTo("admin"), approveProject);
 router.patch("/:id/reject", restrictTo("admin"), rejectProject);
+
+// Project Notes
+router.post("/:id/notes", validateProjectNote, addProjectNote);
+router.get("/:id/notes", getProjectNotes);
+router.delete("/:id/notes/:noteId", deleteProjectNote);
 
 module.exports = router;

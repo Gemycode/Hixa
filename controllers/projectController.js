@@ -3,9 +3,11 @@ const ProjectRoom = require("../models/projectRoomModel");
 const ChatRoom = require("../models/chatRoomModel");
 const Message = require("../models/messageModel");
 const Proposal = require("../models/proposalModel");
+const ProjectNote = require("../models/projectNoteModel");
 const { uploadToCloudinary, uploadFileToCloudinary, deleteFromCloudinary } = require("../middleware/upload");
 const { getSystemUserId } = require("../utils/systemUser");
 const { createNotification } = require("./notificationController");
+const { validateStatusTransition } = require("../utils/projectStatusValidator");
 
 // Helper to sanitize project data for response
 const sanitizeProject = (project) => {
@@ -24,7 +26,10 @@ const sanitizeProject = (project) => {
     assignedEngineer: projectObj.assignedEngineer,
     status: projectObj.status,
     budget: projectObj.budget,
+    startDate: projectObj.startDate,
     deadline: projectObj.deadline,
+    progress: projectObj.progress || 0,
+    statusHistory: projectObj.statusHistory || [],
     attachments: projectObj.attachments || [],
     proposalsCount: projectObj.proposalsCount || 0,
     isActive: projectObj.isActive,
@@ -53,6 +58,7 @@ exports.createProject = async (req, res, next) => {
       requirements,
       projectType,
       budget,
+      startDate,
       deadline,
       tags,
     } = req.body;
@@ -73,7 +79,16 @@ exports.createProject = async (req, res, next) => {
       projectType,
       client: req.user._id,
       budget: budget || {},
+      startDate: startDate ? new Date(startDate) : undefined,
       deadline: deadline ? new Date(deadline) : undefined,
+      progress: 0,
+      statusHistory: [
+        {
+          status: "Pending Review",
+          changedBy: req.user._id,
+          changedAt: new Date(),
+        },
+      ],
       tags: tags || [],
       status: "Pending Review", // يبدأ في انتظار مراجعة الأدمن
       adminApproval: {
@@ -377,7 +392,9 @@ exports.updateProject = async (req, res, next) => {
       requirements,
       projectType,
       budget,
+      startDate,
       deadline,
+      progress,
       tags,
       status,
       assignedEngineer, // Add this
@@ -408,6 +425,14 @@ exports.updateProject = async (req, res, next) => {
       }
     }
 
+    // Validate status transition if status is being changed
+    if (status !== undefined && status !== project.status) {
+      const validation = validateStatusTransition(project.status, status, req.user.role, project);
+      if (!validation.valid) {
+        return res.status(400).json({ message: validation.message });
+      }
+    }
+
     // Update fields
     if (title !== undefined) project.title = title;
     if (description !== undefined) project.description = description;
@@ -426,10 +451,29 @@ exports.updateProject = async (req, res, next) => {
     if (requirements !== undefined) project.requirements = requirements;
     if (projectType !== undefined) project.projectType = projectType;
     if (budget !== undefined) project.budget = { ...project.budget, ...budget };
+    if (startDate !== undefined) project.startDate = startDate ? new Date(startDate) : undefined;
     if (deadline !== undefined) project.deadline = deadline ? new Date(deadline) : undefined;
+    if (progress !== undefined) {
+      const progressValue = parseInt(progress, 10);
+      if (progressValue >= 0 && progressValue <= 100) {
+        project.progress = progressValue;
+      }
+    }
     if (tags !== undefined) project.tags = tags;
-    if (status !== undefined && req.user.role !== "client") {
+    
+    // Update status with history tracking
+    if (status !== undefined && status !== project.status && req.user.role !== "client") {
+      // Add to status history
+      if (!project.statusHistory) {
+        project.statusHistory = [];
+      }
+      project.statusHistory.push({
+        status: project.status, // Previous status
+        changedBy: req.user._id,
+        changedAt: new Date(),
+      });
       project.status = status;
+    }
     } else if (status !== undefined && ["Draft", "Pending Review", "Waiting for Engineers"].includes(status)) {
       project.status = status;
     }
@@ -575,7 +619,7 @@ exports.updateProject = async (req, res, next) => {
   }
 };
 
-// DELETE project (Client can delete their own projects)
+// DELETE project (Client can delete their own projects - Soft Delete)
 exports.deleteProject = async (req, res, next) => {
   try {
     const project = await Project.findById(req.params.id);
@@ -595,6 +639,88 @@ exports.deleteProject = async (req, res, next) => {
 
     res.json({
       message: "تم حذف المشروع بنجاح",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// HARD DELETE project (Admin only - Permanent deletion)
+exports.hardDeleteProject = async (req, res, next) => {
+  try {
+    const project = await Project.findById(req.params.id);
+
+    if (!project) {
+      return res.status(404).json({ message: "المشروع غير موجود" });
+    }
+
+    // Only admin can hard delete
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "الحذف النهائي متاح للأدمن فقط" });
+    }
+
+    // Delete project permanently
+    await Project.findByIdAndDelete(req.params.id);
+
+    res.json({
+      message: "تم حذف المشروع نهائياً",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// DUPLICATE project (Create a copy of an existing project)
+exports.duplicateProject = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const originalProject = await Project.findById(id);
+
+    if (!originalProject) {
+      return res.status(404).json({ message: "المشروع غير موجود" });
+    }
+
+    // Check permissions - only client can duplicate their own projects, or admin
+    if (req.user.role === "client" && originalProject.client.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "غير مصرح لك بنسخ هذا المشروع" });
+    }
+
+    // Create duplicate
+    const duplicateData = {
+      title: `نسخة من ${originalProject.title}`,
+      description: originalProject.description,
+      country: originalProject.country,
+      city: originalProject.city,
+      location: originalProject.location,
+      category: originalProject.category,
+      requirements: originalProject.requirements,
+      projectType: originalProject.projectType,
+      budget: originalProject.budget,
+      startDate: originalProject.startDate,
+      deadline: originalProject.deadline,
+      tags: originalProject.tags,
+      client: originalProject.client,
+      status: "Draft", // Always start as Draft
+      progress: 0,
+      statusHistory: [
+        {
+          status: "Draft",
+          changedBy: req.user._id,
+          changedAt: new Date(),
+          reason: "Duplicate project",
+        },
+      ],
+      adminApproval: {
+        status: "pending",
+      },
+      // Don't copy: assignedEngineer, attachments, proposalsCount, proposals
+    };
+
+    const duplicatedProject = await Project.create(duplicateData);
+
+    res.status(201).json({
+      message: "تم نسخ المشروع بنجاح",
+      data: sanitizeProject(duplicatedProject),
     });
   } catch (error) {
     next(error);
@@ -719,6 +845,18 @@ exports.approveProject = async (req, res, next) => {
     project.adminApproval.status = "approved";
     project.adminApproval.reviewedBy = req.user._id;
     project.adminApproval.reviewedAt = new Date();
+    
+    // Add status history entry
+    if (!project.statusHistory) {
+      project.statusHistory = [];
+    }
+    project.statusHistory.push({
+      status: project.status,
+      changedBy: req.user._id,
+      changedAt: new Date(),
+      reason: "Admin approval",
+    });
+    
     project.status = "Waiting for Engineers"; // بعد الموافقة، ينتظر المهندسين
 
     await project.save();
@@ -773,6 +911,18 @@ exports.rejectProject = async (req, res, next) => {
     project.adminApproval.reviewedBy = req.user._id;
     project.adminApproval.reviewedAt = new Date();
     project.adminApproval.rejectionReason = rejectionReason.trim();
+    
+    // Add status history entry
+    if (!project.statusHistory) {
+      project.statusHistory = [];
+    }
+    project.statusHistory.push({
+      status: project.status,
+      changedBy: req.user._id,
+      changedAt: new Date(),
+      reason: `Rejection: ${rejectionReason.trim()}`,
+    });
+    
     project.status = "Rejected"; // رفض المشروع
 
     await project.save();
@@ -832,6 +982,113 @@ exports.getPendingProjects = async (req, res, next) => {
         limit,
         pages: Math.ceil(total / limit) || 1,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Add note to project
+exports.addProjectNote = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { note, isInternal } = req.body;
+
+    if (!note || note.trim().length === 0) {
+      return res.status(400).json({ message: "الملاحظة مطلوبة" });
+    }
+
+    const project = await Project.findById(id);
+    if (!project) {
+      return res.status(404).json({ message: "المشروع غير موجود" });
+    }
+
+    // Check permissions
+    if (req.user.role === "client" && project.client.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "غير مصرح لك بإضافة ملاحظات لهذا المشروع" });
+    }
+
+    // Clients cannot create internal notes
+    const noteIsInternal = req.user.role !== "client" && (isInternal === true || isInternal === "true");
+
+    const projectNote = await ProjectNote.create({
+      project: project._id,
+      note: note.trim(),
+      createdBy: req.user._id,
+      isInternal: noteIsInternal,
+    });
+
+    const populatedNote = await ProjectNote.findById(projectNote._id)
+      .populate("createdBy", "name email avatar");
+
+    res.status(201).json({
+      message: "تم إضافة الملاحظة بنجاح",
+      data: populatedNote,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get project notes
+exports.getProjectNotes = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const project = await Project.findById(id);
+    if (!project) {
+      return res.status(404).json({ message: "المشروع غير موجود" });
+    }
+
+    // Check permissions
+    if (req.user.role === "client" && project.client.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "غير مصرح لك بعرض ملاحظات هذا المشروع" });
+    }
+
+    // Filter notes based on user role
+    const filters = { project: project._id };
+    
+    // Clients cannot see internal notes
+    if (req.user.role === "client") {
+      filters.isInternal = false;
+    }
+
+    const notes = await ProjectNote.find(filters)
+      .populate("createdBy", "name email avatar")
+      .sort({ createdAt: -1 });
+
+    res.json({
+      data: notes,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Delete project note
+exports.deleteProjectNote = async (req, res, next) => {
+  try {
+    const { id, noteId } = req.params;
+
+    const project = await Project.findById(id);
+    if (!project) {
+      return res.status(404).json({ message: "المشروع غير موجود" });
+    }
+
+    const note = await ProjectNote.findById(noteId);
+    if (!note || note.project.toString() !== id) {
+      return res.status(404).json({ message: "الملاحظة غير موجودة" });
+    }
+
+    // Check permissions: user can delete their own notes, admin can delete any
+    if (note.createdBy.toString() !== req.user._id.toString() && req.user.role !== "admin") {
+      return res.status(403).json({ message: "غير مصرح لك بحذف هذه الملاحظة" });
+    }
+
+    await ProjectNote.findByIdAndDelete(noteId);
+
+    res.json({
+      message: "تم حذف الملاحظة بنجاح",
     });
   } catch (error) {
     next(error);

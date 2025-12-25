@@ -602,10 +602,11 @@ const validateProject = (req, res, next) => {
       amount: Joi.number().min(0).optional(),
       currency: Joi.string().max(10).optional(),
     }).optional(),
+    startDate: Joi.date().optional(),
     deadline: Joi.date().optional(),
     tags: Joi.array().items(Joi.string().trim().max(50)).optional(),
     status: Joi.string()
-      .valid("Draft", "Pending Review", "Waiting for Engineers", "In Progress", "Completed", "Cancelled")
+      .valid("Draft", "Pending Review", "Waiting for Engineers", "In Progress", "Completed", "Cancelled", "Rejected")
       .optional(),
   });
 
@@ -648,10 +649,12 @@ const validateProjectUpdate = (req, res, next) => {
       amount: Joi.number().min(0).optional(),
       currency: Joi.string().max(10).optional(),
     }).optional(),
+    startDate: Joi.date().optional(),
     deadline: Joi.date().optional(),
+    progress: Joi.number().min(0).max(100).optional(),
     tags: Joi.array().items(Joi.string().trim().max(50)).optional(),
     status: Joi.string()
-      .valid("Draft", "Pending Review", "Waiting for Engineers", "In Progress", "Completed", "Cancelled")
+      .valid("Draft", "Pending Review", "Waiting for Engineers", "In Progress", "Completed", "Cancelled", "Rejected")
       .optional(),
   })
     .min(1)
@@ -1197,4 +1200,20 @@ module.exports = {
   validateProposalUpdate,
   validateProfileUpdate,
   validateNotificationCreate,
+  validateProjectNote: (req, res, next) => {
+    const schema = Joi.object({
+      note: Joi.string().trim().max(5000).required().messages({
+        "string.required": "الملاحظة مطلوبة",
+        "string.max": "الملاحظة يجب ألا تتجاوز 5000 حرف",
+      }),
+      isInternal: Joi.boolean().optional(),
+    });
+
+    const { error } = schema.validate(req.body, { abortEarly: false });
+    if (error) {
+      const messages = error.details.map((detail) => detail.message).join(", ");
+      return res.status(400).json({ message: messages });
+    }
+    next();
+  },
 };

@@ -85,9 +85,47 @@ const ProjectSchema = new mongoose.Schema(
       amount: { type: Number, min: 0 },
       currency: { type: String, default: "SAR", maxlength: 10 },
     },
+    startDate: {
+      type: Date,
+    },
     deadline: {
       type: Date,
     },
+    progress: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 0,
+    },
+    statusHistory: [
+      {
+        status: {
+          type: String,
+          enum: [
+            "Draft",
+            "Pending Review",
+            "Waiting for Engineers",
+            "In Progress",
+            "Completed",
+            "Cancelled",
+            "Rejected",
+          ],
+        },
+        changedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        changedAt: {
+          type: Date,
+          default: Date.now,
+        },
+        reason: {
+          type: String,
+          trim: true,
+          maxlength: 500,
+        },
+      },
+    ],
     attachments: [
       {
         name: { type: String, trim: true },

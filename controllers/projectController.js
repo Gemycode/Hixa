@@ -2,6 +2,7 @@ const Project = require("../models/projectModel");
 const ProjectRoom = require("../models/projectRoomModel");
 const ChatRoom = require("../models/chatRoomModel");
 const Message = require("../models/messageModel");
+const Proposal = require("../models/proposalModel");
 const { uploadToCloudinary, uploadFileToCloudinary, deleteFromCloudinary } = require("../middleware/upload");
 const { getSystemUserId } = require("../utils/systemUser");
 const { createNotification } = require("./notificationController");
@@ -233,12 +234,12 @@ exports.getProjects = async (req, res, next) => {
   }
 };
 
-// GET single project by ID
+// GET single project by ID with detailed information
 exports.getProjectById = async (req, res, next) => {
   try {
     const project = await Project.findById(req.params.id)
-      .populate("client", "name email")
-      .populate("assignedEngineer", "name email")
+      .populate("client", "name email avatar")
+      .populate("assignedEngineer", "name email avatar")
       .populate("adminApproval.reviewedBy", "name email");
 
     if (!project) {
@@ -258,8 +259,104 @@ exports.getProjectById = async (req, res, next) => {
       }
     }
 
+    // Get additional details
+
+    // Get proposals count and details (based on user role)
+    let proposalsInfo = {
+      total: 0,
+      pending: 0,
+      accepted: 0,
+      rejected: 0,
+      myProposal: null, // For engineers: their proposal if exists
+    };
+
+    try {
+      const proposalFilters = { project: project._id };
+      
+      // Engineers only see their own proposal count/details
+      if (req.user.role === "engineer") {
+        proposalFilters.engineer = req.user._id;
+        const myProposal = await Proposal.findOne(proposalFilters)
+          .populate("engineer", "name email avatar")
+          .lean();
+        if (myProposal) {
+          proposalsInfo.total = 1;
+          proposalsInfo[myProposal.status] = 1;
+          proposalsInfo.myProposal = {
+            id: myProposal._id,
+            description: myProposal.description,
+            estimatedTimeline: myProposal.estimatedTimeline,
+            proposedBudget: myProposal.proposedBudget,
+            status: myProposal.status,
+            createdAt: myProposal.createdAt,
+          };
+        }
+      } else {
+        // Admin and Client see all proposals
+        const [total, pending, accepted, rejected] = await Promise.all([
+          Proposal.countDocuments(proposalFilters),
+          Proposal.countDocuments({ ...proposalFilters, status: "pending" }),
+          Proposal.countDocuments({ ...proposalFilters, status: "accepted" }),
+          Proposal.countDocuments({ ...proposalFilters, status: "rejected" }),
+        ]);
+        
+        proposalsInfo.total = total;
+        proposalsInfo.pending = pending;
+        proposalsInfo.accepted = accepted;
+        proposalsInfo.rejected = rejected;
+      }
+    } catch (proposalError) {
+      console.error("Error fetching proposals info:", proposalError);
+      // Continue without proposals info
+    }
+
+    // Get ProjectRoom info if exists
+    let projectRoomInfo = null;
+    try {
+      const projectRoom = await ProjectRoom.findOne({ project: project._id }).lean();
+      if (projectRoom) {
+        projectRoomInfo = {
+          id: projectRoom._id,
+          lastActivityAt: projectRoom.lastActivityAt,
+        };
+      }
+    } catch (projectRoomError) {
+      console.error("Error fetching project room info:", projectRoomError);
+    }
+
+    // Get ChatRooms count (if user has access)
+    let chatRoomsCount = 0;
+    try {
+      if (projectRoomInfo) {
+        const chatRooms = await ChatRoom.find({ project: project._id });
+        // Filter based on user role and participation
+        if (req.user.role === "admin") {
+          chatRoomsCount = chatRooms.length;
+        } else {
+          chatRoomsCount = chatRooms.filter(room => {
+            return room.participants.some(p => p.user.toString() === req.user._id.toString());
+          }).length;
+        }
+      }
+    } catch (chatRoomError) {
+      console.error("Error fetching chat rooms count:", chatRoomError);
+    }
+
+    // Build response with project data and additional info
+    const projectData = sanitizeProject(project);
+    
     res.json({
-      data: sanitizeProject(project),
+      data: {
+        ...projectData,
+        // Additional detailed information
+        proposals: proposalsInfo,
+        projectRoom: projectRoomInfo,
+        chatRoomsCount,
+        // Calculate duration if start date exists (for future use)
+        // duration: project.startDate && project.deadline 
+        //   ? Math.ceil((new Date(project.deadline) - new Date(project.startDate)) / (1000 * 60 * 60 * 24))
+        //   : null,
+      },
     });
   } catch (error) {
     next(error);

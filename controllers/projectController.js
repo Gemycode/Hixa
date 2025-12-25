@@ -462,19 +462,22 @@ exports.updateProject = async (req, res, next) => {
     if (tags !== undefined) project.tags = tags;
     
     // Update status with history tracking
-    if (status !== undefined && status !== project.status && req.user.role !== "client") {
-      // Add to status history
-      if (!project.statusHistory) {
-        project.statusHistory = [];
+    if (status !== undefined && status !== project.status) {
+      if (req.user.role !== "client") {
+        // Add to status history for non-client users
+        if (!project.statusHistory) {
+          project.statusHistory = [];
+        }
+        project.statusHistory.push({
+          status: project.status, // Previous status
+          changedBy: req.user._id,
+          changedAt: new Date(),
+        });
       }
-      project.statusHistory.push({
-        status: project.status, // Previous status
-        changedBy: req.user._id,
-        changedAt: new Date(),
-      });
+      // Update status
       project.status = status;
-    }
-    } else if (status !== undefined && ["Draft", "Pending Review", "Waiting for Engineers"].includes(status)) {
+    } else if (status !== undefined && ["Draft", "Pending Review", "Waiting for Engineers"].includes(status) && req.user.role === "client") {
+      // Client can only set these statuses without history tracking
       project.status = status;
     }
     

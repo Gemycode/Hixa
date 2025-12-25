@@ -42,7 +42,50 @@ app.set('wss', wss);
 app.set('trust proxy', 1);
 
 app.use(helmet());
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:3000', credentials: true }));
+
+// CORS Configuration - Allow any localhost port in development
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    // In production, use FRONTEND_URL if set
+    if (process.env.NODE_ENV === 'production' && process.env.FRONTEND_URL) {
+      const allowedOrigins = process.env.FRONTEND_URL.split(',').map(url => url.trim());
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error('Not allowed by CORS'));
+    }
+    
+    // In development, allow any localhost origin (any port)
+    if (origin.startsWith('http://localhost:') || origin.startsWith('https://localhost:')) {
+      return callback(null, true);
+    }
+    
+    // Allow specific FRONTEND_URL if set in development
+    if (process.env.FRONTEND_URL) {
+      const allowedOrigins = process.env.FRONTEND_URL.split(',').map(url => url.trim());
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+    }
+    
+    // Default: allow in development, deny in production
+    if (process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+};
+
+app.use(cors(corsOptions));
 
 app.use(express.json({ limit: config.fileUpload?.maxFileUpload || '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));

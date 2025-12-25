@@ -38,3 +38,5 @@ router.delete("/:id", deleteNotification);
 router.delete("/read/all", deleteAllRead);
 
 module.exports = router;
+
+

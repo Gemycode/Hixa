@@ -14,9 +14,22 @@ const ProjectSchema = new mongoose.Schema(
       trim: true,
       maxlength: 5000,
     },
-    location: {
+    // Location fields
+    country: {
       type: String,
       required: true,
+      trim: true,
+      maxlength: 100,
+    },
+    city: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 100,
+    },
+    // Keep location for backward compatibility (optional, can be auto-generated)
+    location: {
+      type: String,
       trim: true,
       maxlength: 200,
     },
@@ -129,6 +142,9 @@ ProjectSchema.index({ projectType: 1 });
 ProjectSchema.index({ status: 1 });
 ProjectSchema.index({ createdAt: -1 });
 ProjectSchema.index({ location: 1 });
+ProjectSchema.index({ country: 1, city: 1 }); // للبحث السريع حسب الموقع
+ProjectSchema.index({ country: 1 }); // للبحث حسب الدولة
+ProjectSchema.index({ city: 1 }); // للبحث حسب المدينة
 ProjectSchema.index({ category: 1 });
 ProjectSchema.index({ "adminApproval.status": 1, status: 1 }); // للبحث السريع عن المشاريع في انتظار المراجعة
 

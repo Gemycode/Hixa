@@ -495,7 +495,9 @@ const validateUserUpdate = (req, res, next) => {
     name: Joi.string().trim().max(100),
     phone: Joi.string().trim().max(50),
     nationalId: Joi.string().trim().max(20).optional(),
-    location: Joi.string().trim().max(200),
+    country: Joi.string().trim().max(100).optional(),
+    city: Joi.string().trim().max(100).optional(),
+    location: Joi.string().trim().max(200).optional(),
     bio: Joi.string().trim().max(1000),
     role: Joi.string().valid(...roles),
     isActive: Joi.boolean(),
@@ -566,8 +568,15 @@ const validateProject = (req, res, next) => {
       "string.required": "وصف المشروع مطلوب",
       "string.max": "وصف المشروع يجب ألا يتجاوز 5000 حرف",
     }),
-    location: Joi.string().trim().max(200).required().messages({
-      "string.required": "الموقع مطلوب",
+    country: Joi.string().trim().max(100).required().messages({
+      "string.required": "الدولة مطلوبة",
+      "string.max": "الدولة يجب ألا تتجاوز 100 حرف",
+    }),
+    city: Joi.string().trim().max(100).required().messages({
+      "string.required": "المدينة مطلوبة",
+      "string.max": "المدينة يجب ألا تتجاوز 100 حرف",
+    }),
+    location: Joi.string().trim().max(200).optional().messages({
       "string.max": "الموقع يجب ألا يتجاوز 200 حرف",
     }),
     category: Joi.string().trim().max(100).optional(),
@@ -613,6 +622,12 @@ const validateProjectUpdate = (req, res, next) => {
   const schema = Joi.object({
     title: Joi.string().trim().max(200).optional(),
     description: Joi.string().trim().max(5000).optional(),
+    country: Joi.string().trim().max(100).optional().messages({
+      "string.max": "الدولة يجب ألا تتجاوز 100 حرف",
+    }),
+    city: Joi.string().trim().max(100).optional().messages({
+      "string.max": "المدينة يجب ألا تتجاوز 100 حرف",
+    }),
     location: Joi.string().trim().max(200).optional(),
     category: Joi.string().trim().max(100).optional(),
     requirements: Joi.string().trim().max(5000).optional(),
@@ -732,7 +747,9 @@ const validateProfileUpdate = (req, res, next) => {
     email: Joi.string().pattern(emailRegex),
     name: Joi.string().trim().max(100),
     phone: Joi.string().trim().max(50),
-    location: Joi.string().trim().max(200),
+    country: Joi.string().trim().max(100).optional(),
+    city: Joi.string().trim().max(100).optional(),
+    location: Joi.string().trim().max(200).optional(),
     bio: Joi.string().trim().max(1000),
     specializations: Joi.alternatives().try(
       Joi.array().items(Joi.string().trim().max(100)),

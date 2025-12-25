@@ -3,7 +3,9 @@ const Project = require("../models/projectModel");
 const ProjectRoom = require("../models/projectRoomModel");
 const ChatRoom = require("../models/chatRoomModel");
 const Message = require("../models/messageModel");
+const User = require("../models/userModel");
 const { getSystemUserId } = require("../utils/systemUser");
+const { createNotification } = require("./notificationController");
 
 // Format proposal for responses
 const sanitizeProposal = (proposal, userRole = null) => {
@@ -95,7 +97,9 @@ exports.createProposal = async (req, res, next) => {
           projectTitle: project.title,
         });
         
-        console.log(`Created ProjectRoom for project ${projectId}`);
+        console.log(`✅ Created ProjectRoom for project ${projectId}`, projectRoom._id);
+      } else {
+        console.log(`ℹ️  ProjectRoom already exists for project ${projectId}`, projectRoom._id);
       }
 
       // Check if ChatRoom between Admin and Engineer already exists
@@ -123,7 +127,9 @@ exports.createProposal = async (req, res, next) => {
           ],
         });
         
-        console.log(`Created Admin-Engineer ChatRoom for project ${projectId}`);
+        console.log(`✅ Created Admin-Engineer ChatRoom for project ${projectId}`, adminEngineerChatRoom._id);
+      } else {
+        console.log(`ℹ️  Admin-Engineer ChatRoom already exists for project ${projectId}`, adminEngineerChatRoom._id);
       }
 
       // Check if ChatRoom between Admin and Client already exists
@@ -149,7 +155,7 @@ exports.createProposal = async (req, res, next) => {
           ],
         });
         
-        console.log(`Created Admin-Client ChatRoom for project ${projectId}`);
+        console.log(`✅ Created Admin-Client ChatRoom for project ${projectId}`, adminClientChatRoom._id);
         
         // Send system message in Admin-Client ChatRoom
         const systemUserId = await getSystemUserId();
@@ -190,9 +196,35 @@ exports.createProposal = async (req, res, next) => {
       projectRoom.lastActivityAt = systemMessageEngineer.createdAt;
       await projectRoom.save();
       
+      // Create notifications for admins
+      try {
+        // Notify Admin about new proposal
+        const adminUsers = await User.find({ role: "admin", isActive: true }).select("_id");
+        if (adminUsers.length > 0) {
+          const adminNotificationPromises = adminUsers.map(admin =>
+            createNotification({
+              user: admin._id,
+              type: "proposal_submitted",
+              title: "عرض جديد",
+              message: `المهندس ${req.user.name || 'مجهول'} قدم عرضاً على المشروع "${project.title}"`,
+              data: {
+                projectId: project._id,
+                proposalId: proposal._id,
+              },
+              actionUrl: `/projects/${project._id}/proposals`,
+            }).catch(err => console.error("❌ Error creating admin notification:", err))
+          );
+          await Promise.all(adminNotificationPromises);
+          console.log(`✅ Created ${adminUsers.length} notification(s) for admins about new proposal`);
+        }
+      } catch (notifError) {
+        console.error("❌ Error creating notifications:", notifError);
+      }
+      
     } catch (chatError) {
       // Log error but don't fail the proposal creation
-      console.error("Error creating chat rooms:", chatError);
+      console.error("❌ Error creating chat rooms:", chatError);
+      console.error("Error details:", chatError.stack);
     }
 
     res.status(201).json({
@@ -395,6 +427,57 @@ exports.updateProposalStatus = async (req, res, next) => {
         }
       } catch (chatError) {
         console.error("Error creating group chat room:", chatError);
+      }
+      
+      // Create notifications for accepted proposal
+      try {
+        // Notify Engineer
+        await createNotification({
+          user: proposal.engineer,
+          type: "proposal_accepted",
+          title: "تم قبول عرضك",
+          message: `تم قبول عرضك على المشروع "${project.title}"`,
+          data: {
+            projectId: project._id,
+            proposalId: proposal._id,
+          },
+          actionUrl: `/projects/${project._id}`,
+        }).catch(err => console.error("❌ Error creating engineer notification:", err));
+        console.log(`✅ Created notification for engineer about proposal acceptance`);
+
+        // Notify Client
+        await createNotification({
+          user: project.client,
+          type: "project_status_changed",
+          title: "تم تعيين مهندس للمشروع",
+          message: `تم تعيين مهندس للمشروع "${project.title}"`,
+          data: {
+            projectId: project._id,
+            proposalId: proposal._id,
+          },
+          actionUrl: `/projects/${project._id}`,
+        }).catch(err => console.error("❌ Error creating client notification:", err));
+        console.log(`✅ Created notification for client about proposal acceptance`);
+      } catch (notifError) {
+        console.error("❌ Error creating notifications:", notifError);
+      }
+    } else if (status === "rejected" && oldStatus !== "rejected") {
+      // Notify Engineer about rejection
+      try {
+        await createNotification({
+          user: proposal.engineer,
+          type: "proposal_rejected",
+          title: "تم رفض عرضك",
+          message: `تم رفض عرضك على المشروع "${project.title}"`,
+          data: {
+            projectId: project._id,
+            proposalId: proposal._id,
+          },
+          actionUrl: `/proposals/${proposal._id}`,
+        }).catch(err => console.error("❌ Error creating rejection notification:", err));
+        console.log(`✅ Created notification for engineer about proposal rejection`);
+      } catch (notifError) {
+        console.error("❌ Error creating rejection notification:", notifError);
       }
     }
 

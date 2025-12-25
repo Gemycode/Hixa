@@ -2,6 +2,7 @@ const ChatRoom = require("../models/chatRoomModel");
 const ProjectRoom = require("../models/projectRoomModel");
 const Project = require("../models/projectModel");
 const Message = require("../models/messageModel");
+const Proposal = require("../models/proposalModel");
 const mongoose = require("mongoose");
 
 // Get all chat rooms within a project room
@@ -25,8 +26,13 @@ const getChatRoomsByProjectRoom = async (req, res) => {
       }
     } else if (userRole === "engineer") {
       // Check if engineer has submitted proposal for this project
-      // In a complete implementation, you'd check against proposals
-      return res.status(403).json({ message: "غير مسموح لك بالوصول إلى هذه الغرفة" });
+      const hasProposal = await Proposal.findOne({
+        project: projectRoom.project,
+        engineer: userId,
+      });
+      if (!hasProposal) {
+        return res.status(403).json({ message: "غير مسموح لك بالوصول إلى هذه الغرفة" });
+      }
     }
     // Admins can access all project rooms
 
@@ -104,14 +110,34 @@ const getChatRoomById = async (req, res) => {
 const getMyChatRooms = async (req, res) => {
   try {
     const userId = req.user._id;
+    const userRole = req.user.role;
 
-    const chatRooms = await ChatRoom.find({ "participants.user": userId })
+    let chatRoomQuery = { "participants.user": userId };
+
+    // For engineers, also include rooms where they are the engineer (even if not in participants yet)
+    if (userRole === "engineer") {
+      chatRoomQuery = {
+        $or: [
+          { "participants.user": userId },
+          { engineer: userId },
+        ],
+      };
+    }
+
+    const chatRooms = await ChatRoom.find(chatRoomQuery)
       .populate("projectRoom", "project projectTitle")
-      .populate("project", "title")
-      .populate("participants.user", "name email role")
-      .populate("engineer", "name")
-      .populate("lastMessage.sender", "name")
-      .sort({ "lastMessage.createdAt": -1, createdAt: -1 });
+      .populate("project", "title status")
+      .populate("participants.user", "name email role avatar")
+      .populate("engineer", "name email role avatar")
+      .populate("lastMessage.sender", "name avatar")
+      .lean(); // Use lean() for better performance
+
+    // Sort: rooms with lastMessage first (by lastMessage date), then by createdAt
+    chatRooms.sort((a, b) => {
+      const aDate = a.lastMessage?.createdAt || a.createdAt;
+      const bDate = b.lastMessage?.createdAt || b.createdAt;
+      return new Date(bDate) - new Date(aDate);
+    });
 
     res.json({ data: chatRooms });
   } catch (error) {

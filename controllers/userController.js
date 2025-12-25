@@ -7,7 +7,9 @@ const sanitizeUser = (user) => ({
   role: user.role,
   phone: user.phone,
   nationalId: user.nationalId,
-  location: user.location,
+  country: user.country,
+  city: user.city,
+  location: user.location, // Keep for backward compatibility
   bio: user.bio,
   specializations: user.specializations || [],
   certifications: user.certifications || [],
@@ -38,7 +40,7 @@ const { uploadToCloudinary } = require("../middleware/upload");
 
 const updateProfile = async (req, res, next) => {
   try {
-    const { name, email, phone, location, bio, specializations, certifications } = req.body;
+    const { name, email, phone, country, city, location, bio, specializations, certifications } = req.body;
 
     const user = await User.findById(req.user._id);
     if (!user) {
@@ -48,7 +50,17 @@ const updateProfile = async (req, res, next) => {
     if (typeof name !== "undefined") user.name = name;
     if (typeof email !== "undefined") user.email = email;
     if (typeof phone !== "undefined") user.phone = phone;
+    if (typeof country !== "undefined") user.country = country;
+    if (typeof city !== "undefined") user.city = city;
     if (typeof location !== "undefined") user.location = location;
+    // Auto-generate location if country/city changed
+    if ((country !== undefined || city !== undefined) && !location) {
+      const newCountry = country !== undefined ? country : user.country;
+      const newCity = city !== undefined ? city : user.city;
+      if (newCountry && newCity) {
+        user.location = `${newCity}, ${newCountry}`;
+      }
+    }
     if (typeof bio !== "undefined") user.bio = bio;
 
     // Helper parsers
@@ -191,11 +203,21 @@ const updateUser = async (req, res, next) => {
     const { id } = req.params;
     const updates = {};
 
-    ["email", "name", "phone", "nationalId", "role", "isActive"].forEach((field) => {
+    ["email", "name", "phone", "nationalId", "country", "city", "location", "role", "isActive"].forEach((field) => {
       if (typeof req.body[field] !== "undefined") {
         updates[field] = req.body[field];
       }
     });
+
+    // Auto-generate location if country/city changed
+    if ((req.body.country !== undefined || req.body.city !== undefined) && !req.body.location) {
+      const user = await User.findById(id);
+      const newCountry = req.body.country !== undefined ? req.body.country : user.country;
+      const newCity = req.body.city !== undefined ? req.body.city : user.city;
+      if (newCountry && newCity) {
+        updates.location = `${newCity}, ${newCountry}`;
+      }
+    }
 
     if (req.body.password) {
       updates.password = req.body.password;

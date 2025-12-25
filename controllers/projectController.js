@@ -4,6 +4,7 @@ const ChatRoom = require("../models/chatRoomModel");
 const Message = require("../models/messageModel");
 const { uploadToCloudinary, uploadFileToCloudinary, deleteFromCloudinary } = require("../middleware/upload");
 const { getSystemUserId } = require("../utils/systemUser");
+const { createNotification } = require("./notificationController");
 
 // Helper to sanitize project data for response
 const sanitizeProject = (project) => {
@@ -12,7 +13,9 @@ const sanitizeProject = (project) => {
     id: projectObj._id,
     title: projectObj.title,
     description: projectObj.description,
-    location: projectObj.location,
+    country: projectObj.country,
+    city: projectObj.city,
+    location: projectObj.location, // Keep for backward compatibility
     category: projectObj.category,
     requirements: projectObj.requirements,
     projectType: projectObj.projectType,
@@ -42,7 +45,9 @@ exports.createProject = async (req, res, next) => {
     const {
       title,
       description,
-      location,
+      country,
+      city,
+      location, // Keep for backward compatibility
       category,
       requirements,
       projectType,
@@ -51,12 +56,17 @@ exports.createProject = async (req, res, next) => {
       tags,
     } = req.body;
 
+    // Auto-generate location if not provided (for backward compatibility)
+    const generatedLocation = location || (country && city ? `${city}, ${country}` : null);
+
     // Client can only create projects for themselves
     // المشروع يبدأ في حالة "Pending Review" وينتظر موافقة الأدمن
     const project = await Project.create({
       title,
       description,
-      location,
+      country,
+      city,
+      location: generatedLocation,
       category,
       requirements,
       projectType,
@@ -90,41 +100,63 @@ exports.getProjects = async (req, res, next) => {
 
     // Build filters based on user role
     const filters = {};
+    const andConditions = [];
 
+    // Role-based filters
     if (req.user.role === "client") {
       // Clients only see their own projects
       filters.client = req.user._id;
     } else if (req.user.role === "engineer") {
       // Engineers see projects assigned to them or available projects
-      filters.$or = [
-        { assignedEngineer: req.user._id },
-        { status: "Waiting for Engineers" },
-        { status: "Pending Review" },
-      ];
+      andConditions.push({
+        $or: [
+          { assignedEngineer: req.user._id },
+          { status: "Waiting for Engineers" },
+          { status: "Pending Review" },
+        ],
+      });
     }
     // Admin sees all projects (no filter)
 
+    // Status filter
     if (status) {
       filters.status = status;
     }
 
+    // Project type filter
     if (projectType) {
       filters.projectType = projectType;
     }
 
-    if (city || country) {
-      const locationRegex = new RegExp(city || country, "i");
-      filters.location = locationRegex;
+    // Location filters (country and city)
+    if (country) {
+      filters.country = country;
+    }
+    if (city) {
+      filters.city = city;
+    }
+    // Backward compatibility: if location is provided instead of country/city
+    if (!country && !city && req.query.location) {
+      const locationRegex = new RegExp(req.query.location, "i");
+      andConditions.push({
+        $or: [
+          { location: locationRegex },
+          { country: locationRegex },
+          { city: locationRegex },
+        ],
+      });
     }
 
+    // Search filter
     if (search) {
       const regex = new RegExp(search, "i");
-      filters.$or = [
-        ...(filters.$or || []),
-        { title: regex },
-        { description: regex },
-        { tags: { $in: [regex] } },
-      ];
+      andConditions.push({
+        $or: [
+          { title: regex },
+          { description: regex },
+          { tags: { $in: [regex] } },
+        ],
+      });
     }
 
     // Only show active projects
@@ -137,18 +169,55 @@ exports.getProjects = async (req, res, next) => {
       filters["adminApproval.status"] = "approved";
       filters.status = { $ne: "Rejected" }; // المهندسين لا يرون المشاريع المرفوضة
     }
+
+    // Combine all conditions using $and if needed
+    if (andConditions.length > 0) {
+      filters.$and = andConditions;
+    }
     // Admin و Client يرون جميع المشاريع (لا حاجة لفلتر إضافي)
 
-    const [projects, total] = await Promise.all([
-      Project.find(filters)
+    // Get all projects first (for engineers we need to sort by location priority)
+    let projects;
+    let total;
+
+    if (req.user.role === "engineer" && req.user.country) {
+      // For engineers: fetch all matching projects, then sort by location priority
+      const allProjects = await Project.find(filters)
         .populate("client", "name email")
         .populate("assignedEngineer", "name email")
-        .populate("adminApproval.reviewedBy", "name email")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
-      Project.countDocuments(filters),
-    ]);
+        .populate("adminApproval.reviewedBy", "name email");
+
+      // Sort by location priority
+      const sortedProjects = allProjects.sort((a, b) => {
+        // Priority 1: Same city (if engineer has city)
+        if (req.user.city) {
+          const aCityMatch = a.city === req.user.city ? 1 : 0;
+          const bCityMatch = b.city === req.user.city ? 1 : 0;
+          if (aCityMatch !== bCityMatch) return bCityMatch - aCityMatch;
+        }
+        // Priority 2: Same country
+        const aCountryMatch = (a.country || "").toString() === (req.user.country || "").toString() ? 1 : 0;
+        const bCountryMatch = (b.country || "").toString() === (req.user.country || "").toString() ? 1 : 0;
+        if (aCountryMatch !== bCountryMatch) return bCountryMatch - aCountryMatch;
+        // Priority 3: Newest first
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      });
+
+      total = sortedProjects.length;
+      projects = sortedProjects.slice(skip, skip + limit);
+    } else {
+      // For clients and admins: normal query with pagination
+      [projects, total] = await Promise.all([
+        Project.find(filters)
+          .populate("client", "name email")
+          .populate("assignedEngineer", "name email")
+          .populate("adminApproval.reviewedBy", "name email")
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit),
+        Project.countDocuments(filters),
+      ]);
+    }
 
     res.json({
       data: projects.map(sanitizeProject),
@@ -204,7 +273,9 @@ exports.updateProject = async (req, res, next) => {
     const {
       title,
       description,
-      location,
+      country,
+      city,
+      location, // Keep for backward compatibility
       category,
       requirements,
       projectType,
@@ -243,7 +314,17 @@ exports.updateProject = async (req, res, next) => {
     // Update fields
     if (title !== undefined) project.title = title;
     if (description !== undefined) project.description = description;
+    if (country !== undefined) project.country = country;
+    if (city !== undefined) project.city = city;
     if (location !== undefined) project.location = location;
+    // Auto-update location if country/city changed
+    if (country !== undefined || city !== undefined) {
+      const newCountry = country !== undefined ? country : project.country;
+      const newCity = city !== undefined ? city : project.city;
+      if (newCountry && newCity) {
+        project.location = `${newCity}, ${newCountry}`;
+      }
+    }
     if (category !== undefined) project.category = category;
     if (requirements !== undefined) project.requirements = requirements;
     if (projectType !== undefined) project.projectType = projectType;
@@ -545,6 +626,22 @@ exports.approveProject = async (req, res, next) => {
 
     await project.save();
 
+    // Notify Client
+    try {
+      await createNotification({
+        user: project.client,
+        type: "project_approved",
+        title: "تم الموافقة على مشروعك",
+        message: `تم الموافقة على مشروعك "${project.title}" وهو الآن في انتظار المهندسين`,
+        data: {
+          projectId: project._id,
+        },
+        actionUrl: `/projects/${project._id}`,
+      }).catch(err => console.error("Error creating project approval notification:", err));
+    } catch (notifError) {
+      console.error("Error creating notification:", notifError);
+    }
+
     res.json({
       message: "تم الموافقة على المشروع بنجاح",
       data: sanitizeProject(project),
@@ -582,6 +679,22 @@ exports.rejectProject = async (req, res, next) => {
     project.status = "Rejected"; // رفض المشروع
 
     await project.save();
+
+    // Notify Client
+    try {
+      await createNotification({
+        user: project.client,
+        type: "project_rejected",
+        title: "تم رفض مشروعك",
+        message: `تم رفض مشروعك "${project.title}". السبب: ${rejectionReason.trim()}`,
+        data: {
+          projectId: project._id,
+        },
+        actionUrl: `/projects/${project._id}`,
+      }).catch(err => console.error("Error creating project rejection notification:", err));
+    } catch (notifError) {
+      console.error("Error creating notification:", notifError);
+    }
 
     res.json({
       message: "تم رفض المشروع",

@@ -119,6 +119,12 @@ if (process.env.NODE_ENV === 'development') app.use(morgan('dev'));
 
 const API_PREFIX = '/api/';
 
+// Log all API requests (especially for project-rooms and chat-rooms)
+app.use(`${API_PREFIX}project-rooms`, (req, res, next) => {
+  console.log('🌐 ProjectRoom API Request:', req.method, req.originalUrl, 'Path:', req.path, 'Params:', req.params);
+  next();
+});
+
 // Log all API requests in development
 if (process.env.NODE_ENV === 'development') {
   app.use(`${API_PREFIX}*`, (req, res, next) => {

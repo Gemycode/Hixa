@@ -13,6 +13,7 @@ const {
 // Get all chat rooms within a project room
 const getChatRoomsByProjectRoom = async (req, res) => {
   try {
+    console.log('📥 getChatRoomsByProjectRoom called - roomId:', req.params.roomId, 'userId:', req.user._id, 'role:', req.user.role);
     const { roomId } = req.params;
     const userId = req.user._id;
     const userRole = req.user.role;

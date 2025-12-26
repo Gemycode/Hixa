@@ -142,6 +142,14 @@ app.use(`${API_PREFIX}chat-rooms`, chatRoomRoutes);
 app.use(`${API_PREFIX}messages`, messageRoutes);
 app.use(`${API_PREFIX}notifications`, notificationRoutes);
 
+// Log all registered routes for debugging
+if (process.env.NODE_ENV === 'development' || process.env.LOG_ROUTES === 'true') {
+  console.log('📋 Registered API Routes:');
+  console.log(`  - ${API_PREFIX}project-rooms/:roomId/chat-rooms (GET)`);
+  console.log(`  - ${API_PREFIX}chat-rooms/:roomId/read (PUT)`);
+  console.log(`  - ${API_PREFIX}messages/room/:roomId (GET)`);
+}
+
 app.get("/", (req, res) => res.send("HIXA API is running"));
 
 app.use(errorHandler);

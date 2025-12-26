@@ -3,6 +3,10 @@ const Project = require("../models/projectModel");
 const ChatRoom = require("../models/chatRoomModel");
 const Proposal = require("../models/proposalModel");
 const mongoose = require("mongoose");
+const {
+  addUnreadCountToProjectRooms,
+  addUnreadCountToProjectRoom,
+} = require("../utils/chatHelpers");
 
 // Get all project rooms for dashboard
 const getProjectRooms = async (req, res) => {
@@ -52,8 +56,11 @@ const getProjectRooms = async (req, res) => {
       ProjectRoom.countDocuments(projectRoomQuery),
     ]);
 
+    // Add unread count to each project room
+    const projectRoomsWithUnread = await addUnreadCountToProjectRooms(projectRooms, userId);
+
     res.json({
-      data: projectRooms,
+      data: projectRoomsWithUnread,
       meta: {
         total,
         page,
@@ -104,7 +111,10 @@ const getProjectRoomById = async (req, res) => {
     }
     // Admins can access all project rooms
 
-    res.json({ data: projectRoom });
+    // Add unread count
+    const projectRoomWithUnread = await addUnreadCountToProjectRoom(projectRoom, userId);
+
+    res.json({ data: projectRoomWithUnread });
   } catch (error) {
     if (error.name === "CastError") {
       return res.status(400).json({ message: "معرف الغرفة غير صحيح" });
@@ -146,7 +156,10 @@ const getProjectRoomByProjectId = async (req, res) => {
     }
     // Admins can access all project rooms
 
-    res.json({ data: projectRoom });
+    // Add unread count
+    const projectRoomWithUnread = await addUnreadCountToProjectRoom(projectRoom, userId);
+
+    res.json({ data: projectRoomWithUnread });
   } catch (error) {
     if (error.name === "CastError") {
       return res.status(400).json({ message: "معرف المشروع غير صحيح" });
@@ -155,8 +168,137 @@ const getProjectRoomByProjectId = async (req, res) => {
   }
 };
 
+// Close project room (Admin only)
+const closeProjectRoom = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const userRole = req.user.role;
+
+    if (userRole !== "admin") {
+      return res.status(403).json({ message: "الإغلاق متاح للأدمن فقط" });
+    }
+
+    const projectRoom = await ProjectRoom.findById(roomId);
+    if (!projectRoom) {
+      return res.status(404).json({ message: "غرفة المشروع غير موجودة" });
+    }
+
+    projectRoom.status = "closed";
+    projectRoom.closedAt = new Date();
+    await projectRoom.save();
+
+    res.json({
+      message: "تم إغلاق غرفة المشروع بنجاح",
+      data: projectRoom,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
+  }
+};
+
+// Reopen project room (Admin only)
+const reopenProjectRoom = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const userRole = req.user.role;
+
+    if (userRole !== "admin") {
+      return res.status(403).json({ message: "إعادة الفتح متاحة للأدمن فقط" });
+    }
+
+    const projectRoom = await ProjectRoom.findById(roomId);
+    if (!projectRoom) {
+      return res.status(404).json({ message: "غرفة المشروع غير موجودة" });
+    }
+
+    projectRoom.status = "active";
+    projectRoom.closedAt = undefined;
+    await projectRoom.save();
+
+    res.json({
+      message: "تم إعادة فتح غرفة المشروع بنجاح",
+      data: projectRoom,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
+  }
+};
+
+// Get unread count for a project room
+const getProjectRoomUnreadCount = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const userId = req.user._id;
+
+    const projectRoom = await ProjectRoom.findById(roomId);
+    if (!projectRoom) {
+      return res.status(404).json({ message: "غرفة المشروع غير موجودة" });
+    }
+
+    // Check permissions
+    const userRole = req.user.role;
+    if (userRole === "client") {
+      const project = await Project.findById(projectRoom.project);
+      if (!project || project.client.toString() !== userId.toString()) {
+        return res.status(403).json({ message: "غير مسموح لك بالوصول إلى هذه الغرفة" });
+      }
+    } else if (userRole === "engineer") {
+      const hasProposal = await Proposal.findOne({
+        project: projectRoom.project,
+        engineer: userId,
+      });
+      if (!hasProposal) {
+        return res.status(403).json({ message: "غير مسموح لك بالوصول إلى هذه الغرفة" });
+      }
+    }
+
+    const { calculateUnreadCountForProjectRoom } = require("../utils/chatHelpers");
+    const unreadCount = await calculateUnreadCountForProjectRoom(roomId, userId);
+
+    res.json({
+      data: {
+        projectRoomId: roomId,
+        unreadCount,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
+  }
+};
+
+// Get project room statistics (Admin only)
+const getProjectRoomStatistics = async (req, res) => {
+  try {
+    const userRole = req.user.role;
+
+    if (userRole !== "admin") {
+      return res.status(403).json({ message: "الإحصائيات متاحة للأدمن فقط" });
+    }
+
+    const [total, active, closed] = await Promise.all([
+      ProjectRoom.countDocuments({}),
+      ProjectRoom.countDocuments({ status: "active" }),
+      ProjectRoom.countDocuments({ status: "closed" }),
+    ]);
+
+    res.json({
+      data: {
+        total,
+        active,
+        closed,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
+  }
+};
+
 module.exports = {
   getProjectRooms,
   getProjectRoomById,
   getProjectRoomByProjectId,
+  closeProjectRoom,
+  reopenProjectRoom,
+  getProjectRoomUnreadCount,
+  getProjectRoomStatistics,
 };

@@ -258,15 +258,9 @@ const markMessageAsRead = async (req, res) => {
       await message.save();
     }
 
-    // Update participant's lastReadAt in chat room
-    const participantIndex = chatRoom.participants.findIndex(
-      p => p.user.toString() === userId.toString()
-    );
-
-    if (participantIndex !== -1) {
-      chatRoom.participants[participantIndex].lastReadAt = new Date();
-      await chatRoom.save();
-    }
+    // Update participant's lastReadAt in chat room (use helper function)
+    const { updateLastReadAt } = require("../utils/chatHelpers");
+    await updateLastReadAt(message.chatRoom.toString(), userId);
 
     res.json({ message: "تم تحديث حالة القراءة بنجاح" });
   } catch (error) {

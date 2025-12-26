@@ -1216,4 +1216,22 @@ module.exports = {
     }
     next();
   },
+  validateAddParticipant: (req, res, next) => {
+    const schema = Joi.object({
+      userId: Joi.string().required().messages({
+        "any.required": "معرف المستخدم مطلوب",
+      }),
+      role: Joi.string().valid("admin", "engineer", "client").required().messages({
+        "any.required": "الدور مطلوب",
+        "any.only": "الدور يجب أن يكون: admin, engineer, أو client",
+      }),
+    });
+
+    const { error } = schema.validate(req.body, { abortEarly: false });
+    if (error) {
+      const messages = error.details.map((detail) => detail.message).join(", ");
+      return res.status(400).json({ message: messages });
+    }
+    next();
+  },
 };

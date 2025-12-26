@@ -14,7 +14,7 @@ const connectDB = async () => {
     console.error("❌ Full error:", err);
     // Don't exit in development - allow server to start but operations will fail
     if (process.env.NODE_ENV === 'production') {
-      process.exit(1);
+    process.exit(1);
     } else {
       console.warn("⚠️ Continuing without MongoDB connection (development mode)");
     }

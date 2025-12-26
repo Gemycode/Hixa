@@ -46,6 +46,11 @@ const initSocket = (server) => {
   io.on("connection", (socket) => {
     console.log(`User connected: ${socket.user.name} (${socket.user._id})`);
 
+    // Automatically join user's personal room for notifications
+    const userId = socket.user._id.toString();
+    socket.join(userId);
+    console.log(`✅ User ${socket.user.name} auto-joined personal room: ${userId}`);
+
     // Determine rooms to join based on user role?
     // Or client explicitly joins rooms.
     // Client-side event: socket.emit('join_room', roomId);

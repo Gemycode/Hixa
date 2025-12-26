@@ -42,24 +42,24 @@ const validate = (validations) => {
         console.log('🔍 Validate middleware - Running validations for:', req.path);
       }
       
-      await Promise.all(validations.map(validation => validation.run(req)));
+    await Promise.all(validations.map(validation => validation.run(req)));
 
-      const errors = validationResult(req);
-      if (errors.isEmpty()) {
+    const errors = validationResult(req);
+    if (errors.isEmpty()) {
         if (req.path && req.path.includes('/messages')) {
           console.log('✅ Validate middleware - Validation passed, calling next()');
         }
-        return next();
-      }
+      return next();
+    }
 
       if (req.path && req.path.includes('/messages')) {
         console.error('❌ Validate middleware - Validation errors:', errors.array());
       }
-      
-      const extractedErrors = [];
-      errors.array().map(err => extractedErrors.push({ [err.param]: err.msg }));
 
-      return next(new BadRequestError('بيانات غير صالحة', 400, extractedErrors));
+    const extractedErrors = [];
+    errors.array().map(err => extractedErrors.push({ [err.param]: err.msg }));
+
+    return next(new BadRequestError('بيانات غير صالحة', 400, extractedErrors));
     } catch (error) {
       if (req.path && req.path.includes('/messages')) {
         console.error('❌ Validate middleware - Error:', error);

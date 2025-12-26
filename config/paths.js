@@ -13,7 +13,6 @@ const MIDDLEWARES_DIR = path.join(ROOT_DIR, 'middleware');
 const UTILS_DIR = path.join(ROOT_DIR, 'utils');
 const SERVICES_DIR = path.join(ROOT_DIR, 'services');
 const VALIDATORS_DIR = path.join(ROOT_DIR, 'validators');
-const WEBSOCKET_DIR = path.join(ROOT_DIR, 'websocket');
 
 // Build directories
 const BUILD_DIR = path.join(ROOT_DIR, 'build');
@@ -39,10 +38,9 @@ module.exports = {
   ROUTES_DIR,
   CONTROLLERS_DIR,
   MIDDLEWARES_DIR,
-  UTILS_DIR,
-  SERVICES_DIR,
-  VALIDATORS_DIR,
-  WEBSOCKET_DIR,
+    UTILS_DIR,
+    SERVICES_DIR,
+    VALIDATORS_DIR,
   
   // Test directories
   TESTS_DIR,
@@ -61,7 +59,6 @@ module.exports = {
     '@utils': UTILS_DIR,
     '@services': SERVICES_DIR,
     '@validators': VALIDATORS_DIR,
-    '@websocket': WEBSOCKET_DIR,
     '@test': TESTS_DIR,
   },
 };

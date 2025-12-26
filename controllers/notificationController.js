@@ -1,21 +1,22 @@
 const Notification = require("../models/notificationModel");
 const { NotFoundError, BadRequestError } = require("../utils/errors");
-const { getWebSocketServer } = require("../websocket/websocket");
+const { getIO } = require("../socket");
 
-// Helper function to create notification and emit via WebSocket
+// Helper function to create notification and emit via Socket.io
 const createNotification = async (notificationData) => {
   const notification = await Notification.create(notificationData);
   
-  // Emit real-time notification via WebSocket
+  // Emit real-time notification via Socket.io
   try {
-    const wss = getWebSocketServer();
-    wss.sendToUser(notification.user, {
+    const io = getIO();
+    // Emit to the specific user's room (using userId as room identifier)
+    io.to(notification.user.toString()).emit('new_notification', {
       type: 'new_notification',
       data: notification,
     });
   } catch (error) {
-    // WebSocket might not be initialized or user not connected - that's okay
-    console.log('Could not send notification via WebSocket:', error.message);
+    // Socket.io might not be initialized or user not connected - that's okay
+    console.log('Could not send notification via Socket.io:', error.message);
   }
   
   return notification;

@@ -140,7 +140,7 @@ const sendMessage = async (req, res, next) => {
       content: m.content?.substring(0, 30),
       isDeleted: m.isDeleted
     })));
-    
+
     const message = await Message.create([messageData], { session });
     const newMessage = message[0];
     
@@ -400,9 +400,9 @@ const getMessagesByRoom = async (req, res) => {
       chatRoom: chatRoomObjectId, 
       isDeleted: false 
     })
-      .populate("sender", "name email role avatar")
-      .sort({ createdAt: -1 })
-      .skip(skip)
+        .populate("sender", "name email role avatar")
+        .sort({ createdAt: -1 })
+        .skip(skip)
       .limit(limit)
       .lean(); // Use lean() for better performance
     

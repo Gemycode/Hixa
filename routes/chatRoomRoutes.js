@@ -12,6 +12,7 @@ const {
   addParticipant,
   removeParticipant,
   getChatRoomUnreadCount,
+  markChatRoomAsRead,
   getChatRoomStatistics,
 } = require("../controllers/chatRoomController");
 
@@ -26,6 +27,7 @@ router.get("/:roomId", getChatRoomById);
 router.get("/:roomId/unread-count", getChatRoomUnreadCount);
 router.get("/", getMyChatRooms);
 router.post("/", restrictTo("admin"), validateChatRoomCreate, createChatRoom);
+router.put("/:roomId/read", markChatRoomAsRead);
 router.patch("/:roomId/archive", restrictTo("admin"), archiveChatRoom);
 router.patch("/:roomId/unarchive", restrictTo("admin"), unarchiveChatRoom);
 router.delete("/:roomId", restrictTo("admin"), deleteChatRoom);

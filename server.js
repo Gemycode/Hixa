@@ -22,7 +22,17 @@ connectDB()
   })
   .catch(error => {
     console.error('❌ Failed to connect to MongoDB', error);
-    process.exit(1);
+    // In development, start server anyway but warn about DB issues
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('⚠️ Starting server without MongoDB connection (development mode)');
+      server.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 Server running in ${NODE_ENV || 'development'} mode on port ${PORT}`);
+        console.log(`🔌 WebSocket server is running`);
+        console.warn('⚠️ MongoDB is not connected - API calls will fail');
+      });
+    } else {
+      process.exit(1);
+    }
   });
 
 // Handle unhandled promise rejections

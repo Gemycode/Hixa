@@ -27,7 +27,9 @@ const initSocket = (server) => {
       }
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await User.findById(decoded.id);
+      // JWT uses 'sub' field for user ID (as per authController.js)
+      const userId = decoded.sub || decoded.id;
+      const user = await User.findById(userId);
 
       if (!user) {
         return next(new Error("Authentication error: User not found"));
@@ -54,8 +56,11 @@ const initSocket = (server) => {
       // Better: Check if roomId corresponds to a chatRoom they are participant of.
       // For performance, we might skip DB check here if we trust the API provided the ID after check.
       
-      console.log(`User ${socket.user.name} joined room: ${roomId}`);
+      console.log(`✅ User ${socket.user.name} (${socket.user._id}) joined room: ${roomId}`);
       socket.join(roomId);
+      // Verify room membership
+      const rooms = Array.from(socket.rooms);
+      console.log(`📋 User is now in rooms:`, rooms);
     });
 
     socket.on("leave_room", (roomId) => {
@@ -64,11 +69,14 @@ const initSocket = (server) => {
     });
     
     // Typing indicator
-    socket.on("typing", ({ roomId, isTyping }) => {
-       socket.to(roomId).emit("user_typing", {
-           userId: socket.user._id,
-           isTyping
-       });
+    socket.on("typing", ({ roomId, chatRoomId, isTyping }) => {
+      const targetRoom = chatRoomId || roomId; // Support both for backward compatibility
+      socket.to(targetRoom).emit("user_typing", {
+        userId: socket.user._id,
+        userName: socket.user.name,
+        chatRoomId: targetRoom,
+        isTyping
+      });
     });
 
     socket.on("disconnect", () => {

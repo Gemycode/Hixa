@@ -32,12 +32,13 @@ const notificationRoutes = require('@routes/notificationRoutes');
 const app = express();
 const server = http.createServer(app);
 
-const { initWebSocketServer } = require('@websocket/websocket');
-const wss = initWebSocketServer(server);
+// Initialize Socket.io for real-time communication
+const { initSocket } = require('./socket');
+const io = initSocket(server);
 
 const cache = new NodeCache({ stdTTL: 600 });
 app.set('cache', cache);
-app.set('wss', wss);
+app.set('io', io); // Store io instance for use in controllers
 
 app.set('trust proxy', 1);
 
@@ -117,6 +118,17 @@ app.use(compression());
 if (process.env.NODE_ENV === 'development') app.use(morgan('dev'));
 
 const API_PREFIX = '/api/';
+
+// Log all API requests in development
+if (process.env.NODE_ENV === 'development') {
+  app.use(`${API_PREFIX}*`, (req, res, next) => {
+    if (req.path.includes('/messages')) {
+      console.log('🌐 API Request:', req.method, req.originalUrl, 'Path:', req.path);
+    }
+    next();
+  });
+}
+
 app.use(`${API_PREFIX}auth`, authRoutes);
 app.use(`${API_PREFIX}content`, contentRoutes);
 app.use(`${API_PREFIX}users`, userRoutes);

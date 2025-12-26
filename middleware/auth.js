@@ -2,13 +2,23 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
 
 const protect = async (req, res, next) => {
+  // Log for message routes
+  if (req.path && req.path.includes('/messages')) {
+    console.log('🔐 Protect middleware - Message route:', req.method, req.path, 'Full URL:', req.originalUrl);
+  }
+  
   let token = null;
 
   if (req.headers.authorization && req.headers.authorization.startsWith("Bearer ")) {
     token = req.headers.authorization.split(" ")[1];
   }
 
-  if (!token) return res.status(401).json({ message: "غير مصرح لك بالدخول - يرجى تسجيل الدخول" });
+  if (!token) {
+    if (req.path && req.path.includes('/messages')) {
+      console.log('❌ Protect middleware - No token for message route');
+    }
+    return res.status(401).json({ message: "غير مصرح لك بالدخول - يرجى تسجيل الدخول" });
+  }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);

@@ -50,3 +50,5 @@ ProposalSchema.index({ status: 1, createdAt: -1 }); // للبحث السريع �
 
 module.exports = mongoose.models.Proposal || mongoose.model("Proposal", ProposalSchema);
 
+
+

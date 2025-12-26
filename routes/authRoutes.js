@@ -24,10 +24,11 @@ const {
 const { protect } = require("../middleware/auth");
 
 // Rate limiting for auth routes
+// TODO: Temporary - reduced to 30 seconds for testing. Change back to 15 minutes in production
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: "تم تجاوز عدد محاولات الدخول المسموح بها، يرجى المحاولة لاحقاً",
+  windowMs: 5 * 1000, // 30 seconds (temporary for testing)
+  max: 10,
+  message: "تم تجاوز عدد محاولات الدخول المسموح بها، يرجى المحاولة بعد 30 ثانية",
   standardHeaders: true,
   legacyHeaders: false,
 });

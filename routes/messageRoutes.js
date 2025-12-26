@@ -8,6 +8,12 @@ const { protect } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { uploadMultiple } = require('../middleware/upload');
 
+// Log all requests to message routes
+router.use((req, res, next) => {
+  console.log('🔍 Message route request:', req.method, req.path, 'Params:', req.params);
+  next();
+});
+
 router.use(protect);
 
 const {
@@ -22,6 +28,14 @@ const {
 router.post(
   '/',
   uploadMultiple('attachments', 10),
+  (req, res, next) => {
+    // Log request details for debugging
+    console.log('📤 POST /messages - Request received');
+    console.log('📤 Body:', req.body);
+    console.log('📤 Files:', req.files ? req.files.map(f => ({ name: f.originalname, size: f.size })) : 'No files');
+    console.log('📤 Content-Type:', req.headers['content-type']);
+    next();
+  },
   validateMessageCreate,
   asyncHandler(messageController.sendMessage)
 );
@@ -29,8 +43,20 @@ router.post(
 // Get messages for a chat room
 router.get(
   '/room/:roomId',
-  param('roomId').isMongoId().withMessage('معرف الغرفة غير صالح'),
-  validate,
+  (req, res, next) => {
+    console.log('🔍 GET /api/messages/room/:roomId - Route matched');
+    console.log('🔍 roomId param:', req.params.roomId);
+    const isValid = require('mongoose').Types.ObjectId.isValid(req.params.roomId);
+    console.log('🔍 roomId isMongoId?', isValid);
+    
+    // Validate roomId manually to avoid middleware issues
+    if (!isValid) {
+      console.error('❌ Invalid roomId format');
+      return res.status(400).json({ message: 'معرف الغرفة غير صالح' });
+    }
+    
+    next();
+  },
   asyncHandler(messageController.getMessagesByRoom)
 );
 

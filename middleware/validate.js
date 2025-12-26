@@ -37,17 +37,35 @@ const commonRules = {
 // Common validation middleware
 const validate = (validations) => {
   return async (req, res, next) => {
-    await Promise.all(validations.map(validation => validation.run(req)));
+    try {
+      if (req.path && req.path.includes('/messages')) {
+        console.log('🔍 Validate middleware - Running validations for:', req.path);
+      }
+      
+      await Promise.all(validations.map(validation => validation.run(req)));
 
-    const errors = validationResult(req);
-    if (errors.isEmpty()) {
-      return next();
+      const errors = validationResult(req);
+      if (errors.isEmpty()) {
+        if (req.path && req.path.includes('/messages')) {
+          console.log('✅ Validate middleware - Validation passed, calling next()');
+        }
+        return next();
+      }
+
+      if (req.path && req.path.includes('/messages')) {
+        console.error('❌ Validate middleware - Validation errors:', errors.array());
+      }
+      
+      const extractedErrors = [];
+      errors.array().map(err => extractedErrors.push({ [err.param]: err.msg }));
+
+      return next(new BadRequestError('بيانات غير صالحة', 400, extractedErrors));
+    } catch (error) {
+      if (req.path && req.path.includes('/messages')) {
+        console.error('❌ Validate middleware - Error:', error);
+      }
+      next(error);
     }
-
-    const extractedErrors = [];
-    errors.array().map(err => extractedErrors.push({ [err.param]: err.msg }));
-
-    return next(new BadRequestError('بيانات غير صالحة', 400, extractedErrors));
   };
 };
 
@@ -983,12 +1001,24 @@ const validateChatRoomCreate = (req, res, next) => {
 
 // Message validation
 const validateMessageCreate = (req, res, next) => {
+  // For FormData requests, content might be empty string or missing
+  // We need to handle both JSON and FormData requests
+  const body = req.body || {};
+  const hasFiles = req.files && req.files.length > 0;
+  const hasContent = body.content && body.content.trim().length > 0;
+  
+  // If no files and no content, that's invalid
+  if (!hasFiles && !hasContent) {
+    return res.status(400).json({ 
+      message: "يجب إرسال محتوى نصي أو ملف على الأقل" 
+    });
+  }
+  
   const schema = Joi.object({
     chatRoomId: Joi.string().required().messages({
       "any.required": "معرف غرفة الدردشة مطلوب",
     }),
-    content: Joi.string().max(5000).required().messages({
-      "any.required": "محتوى الرسالة مطلوب",
+    content: Joi.string().max(5000).allow('').optional().messages({
       "string.max": "محتوى الرسالة يجب ألا يتجاوز 5000 حرف",
     }),
     type: Joi.string().valid("text", "file", "system").optional(),
@@ -1001,9 +1031,12 @@ const validateMessageCreate = (req, res, next) => {
     ).optional(),
   });
 
-  const { error } = schema.validate(req.body, { abortEarly: false });
+  const { error } = schema.validate(body, { abortEarly: false, allowUnknown: true });
   if (error) {
     const messages = error.details.map((detail) => detail.message).join(", ");
+    console.error('❌ Message validation error:', messages);
+    console.error('❌ Request body:', body);
+    console.error('❌ Has files:', hasFiles);
     return res.status(400).json({ message: messages });
   }
   next();
@@ -1161,7 +1194,7 @@ module.exports = {
   validatePasswordChange,
   
   // Messages
-  validateMessageCreate: validate(messageRules.create),
+  validateMessageCreate, // Use Joi validation (handles FormData better)
   validateMessageMarkAsRead: validate(messageRules.markAsRead),
   validateMessageDelete: validate(messageRules.delete),
   validateMessageReaction: validate(messageRules.updateReaction),

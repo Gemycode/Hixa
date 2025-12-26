@@ -52,11 +52,13 @@ const getChatRoomsByProjectRoom = async (req, res) => {
         status: "active",
       };
     } else if (userRole === "engineer") {
-      // Engineers see only chat rooms they are participants in
+      // Engineers see only chat rooms they are participants in OR where they are the engineer
+      // This handles both cases: when engineer is in participants array, or when engineer field matches
       chatRoomQuery = {
-        projectRoom: roomId,
-        "participants.user": userId,
-        status: "active",
+        $or: [
+          { projectRoom: roomId, "participants.user": userId, status: "active" },
+          { projectRoom: roomId, engineer: userId, status: "active" },
+        ],
       };
     }
     // Admins see all active chat rooms (no additional filter needed)
@@ -430,6 +432,37 @@ const getChatRoomUnreadCount = async (req, res) => {
   }
 };
 
+// Mark chat room as read (update lastReadAt)
+const markChatRoomAsRead = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const userId = req.user._id;
+
+    const chatRoom = await ChatRoom.findById(roomId);
+    if (!chatRoom) {
+      return res.status(404).json({ message: "غرفة الدردشة غير موجودة" });
+    }
+
+    // Check if user is participant
+    const isParticipant = chatRoom.participants.some(
+      p => p.user.toString() === userId.toString()
+    );
+
+    if (!isParticipant && req.user.role !== "admin") {
+      return res.status(403).json({ message: "غير مسموح لك بالوصول إلى هذه الغرفة" });
+    }
+
+    // Update lastReadAt
+    await updateLastReadAt(roomId, userId);
+
+    res.json({
+      message: "تم تحديث حالة القراءة بنجاح",
+    });
+  } catch (error) {
+    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
+  }
+};
+
 // Get chat room statistics (Admin only)
 const getChatRoomStatistics = async (req, res) => {
   try {
@@ -476,5 +509,6 @@ module.exports = {
   addParticipant,
   removeParticipant,
   getChatRoomUnreadCount,
+  markChatRoomAsRead,
   getChatRoomStatistics,
 };

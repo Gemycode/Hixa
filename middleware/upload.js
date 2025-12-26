@@ -48,7 +48,7 @@ const uploadSingleFile = (fieldName) => {
 
 // Multiple files upload middleware
 const uploadMultiple = (fieldName, maxCount = 10) => {
-  return upload.array(fieldName, maxCount);
+  return uploadAnyFile.array(fieldName, maxCount); // Use uploadAnyFile to accept all file types
 };
 
 // Upload multiple files with different field names

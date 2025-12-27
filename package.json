@@ -7,6 +7,10 @@
   "author": "",
   "type": "commonjs",
   "main": "server.js",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0"
+  },
   "scripts": {
     "start": "node -r module-alias/register server.js",
     "dev": "nodemon -r module-alias/register server.js",
@@ -16,7 +20,8 @@
     "lint:fix": "eslint . --ext .js,.jsx --fix",
     "format": "prettier --write \"**/*.{js,jsx,json,md}\"",
     "db:seed": "node -r module-alias/register ./scripts/seed.js",
-    "db:reset": "node -r module-alias/register ./scripts/reset-db.js"
+    "db:reset": "node -r module-alias/register ./scripts/reset-db.js",
+    "postinstall": "npm install engine.io engine.io-parser --no-save || true"
   },
   "dependencies": {
     "@types/ws": "^8.5.5",
@@ -27,6 +32,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "engine.io": "^6.6.5",
+    "engine.io-parser": "^5.2.3",
     "express": "^5.1.0",
     "express-async-handler": "^1.2.0",
     "express-rate-limit": "^8.2.1",
@@ -35,6 +41,7 @@
     "hpp": "^0.2.3",
     "joi": "^18.0.1",
     "jsonwebtoken": "^9.0.2",
+    "lts": "^2.0.0",
     "module-alias": "^2.2.3",
     "mongodb": "^7.0.0",
     "mongoose": "^8.20.0",

@@ -38,48 +38,29 @@ const io = initSocket(server);
 
 const cache = new NodeCache({ stdTTL: 600 });
 app.set('cache', cache);
-app.set('io', io); // Store io instance for use in controllers
+app.set('io', io);
 
 app.set('trust proxy', 1);
 
 app.use(helmet());
 
-// CORS Configuration - Allow any localhost port in development
+
+// ================== FIXED CORS ==================
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) {
+    if (!origin) return callback(null, true);
+
+    const allowedOrigins = [
+      "https://hixa.com.sa",
+      "https://www.hixa.com.sa",
+      "http://localhost:3000"
+    ];
+
+    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    
-    // In production, use FRONTEND_URL if set
-    if (process.env.NODE_ENV === 'production' && process.env.FRONTEND_URL) {
-      const allowedOrigins = process.env.FRONTEND_URL.split(',').map(url => url.trim());
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      return callback(new Error('Not allowed by CORS'));
-    }
-    
-    // In development, allow any localhost origin (any port)
-    if (origin.startsWith('http://localhost:') || origin.startsWith('https://localhost:')) {
-      return callback(null, true);
-    }
-    
-    // Allow specific FRONTEND_URL if set in development
-    if (process.env.FRONTEND_URL) {
-      const allowedOrigins = process.env.FRONTEND_URL.split(',').map(url => url.trim());
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-    }
-    
-    // Default: allow in development, deny in production
-    if (process.env.NODE_ENV === 'development') {
-      return callback(null, true);
-    }
-    
-    callback(new Error('Not allowed by CORS'));
+
+    return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -87,6 +68,8 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+// =================================================
+
 
 app.use(express.json({ limit: config.fileUpload?.maxFileUpload || '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -119,13 +102,12 @@ if (process.env.NODE_ENV === 'development') app.use(morgan('dev'));
 
 const API_PREFIX = '/api/';
 
-// Log all API requests (especially for project-rooms and chat-rooms)
+// Logging (unchanged)
 app.use(`${API_PREFIX}project-rooms`, (req, res, next) => {
   console.log('🌐 ProjectRoom API Request:', req.method, req.originalUrl, 'Path:', req.path, 'Params:', req.params);
   next();
 });
 
-// Log all API requests in development
 if (process.env.NODE_ENV === 'development') {
   app.use(`${API_PREFIX}*`, (req, res, next) => {
     if (req.path.includes('/messages')) {
@@ -135,6 +117,7 @@ if (process.env.NODE_ENV === 'development') {
   });
 }
 
+// Routes
 app.use(`${API_PREFIX}auth`, authRoutes);
 app.use(`${API_PREFIX}content`, contentRoutes);
 app.use(`${API_PREFIX}users`, userRoutes);
@@ -148,14 +131,7 @@ app.use(`${API_PREFIX}chat-rooms`, chatRoomRoutes);
 app.use(`${API_PREFIX}messages`, messageRoutes);
 app.use(`${API_PREFIX}notifications`, notificationRoutes);
 
-// Log all registered routes for debugging
-if (process.env.NODE_ENV === 'development' || process.env.LOG_ROUTES === 'true') {
-  console.log('📋 Registered API Routes:');
-  console.log(`  - ${API_PREFIX}project-rooms/:roomId/chat-rooms (GET)`);
-  console.log(`  - ${API_PREFIX}chat-rooms/:roomId/read (PUT)`);
-  console.log(`  - ${API_PREFIX}messages/room/:roomId (GET)`);
-}
-
+// Root
 app.get("/", (req, res) => res.send("HIXA API is running"));
 
 app.use(errorHandler);

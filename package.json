@@ -20,8 +20,7 @@
     "lint:fix": "eslint . --ext .js,.jsx --fix",
     "format": "prettier --write \"**/*.{js,jsx,json,md}\"",
     "db:seed": "node -r module-alias/register ./scripts/seed.js",
-    "db:reset": "node -r module-alias/register ./scripts/reset-db.js",
-    "postinstall": "npm install engine.io engine.io-parser --no-save || true"
+    "db:reset": "node -r module-alias/register ./scripts/reset-db.js"
   },
   "dependencies": {
     "@types/ws": "^8.5.5",

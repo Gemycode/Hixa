@@ -5,7 +5,7 @@ const UserSchema = new mongoose.Schema(
   {
     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
     password: { type: String, required: true, select: false },
-    role: { type: String, enum: ["admin", "engineer", "client", "customer"], default: "customer" },
+    role: { type: String, enum: ["admin", "engineer", "client", "company", "customer"], default: "customer" },
     name: { type: String, trim: true },
     phone: { type: String, trim: true, maxlength: 50 },
     nationalId: { type: String, trim: true, maxlength: 20, unique: true, sparse: true }, // الرقم القومي

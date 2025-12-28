@@ -122,8 +122,8 @@ exports.getProjects = async (req, res, next) => {
     if (req.user.role === "client") {
       // Clients only see their own projects
       filters.client = req.user._id;
-    } else if (req.user.role === "engineer") {
-      // Engineers see projects assigned to them or available projects
+    } else if (req.user.role === "engineer" || req.user.role === "company") {
+      // Engineers and companies see projects assigned to them or available projects
       andConditions.push({
         $or: [
           { assignedEngineer: req.user._id },
@@ -179,11 +179,11 @@ exports.getProjects = async (req, res, next) => {
     filters.isActive = true;
 
     // Clients see all their projects (including rejected)
-    // Engineers only see approved projects (unless filtering by status)
+    // Engineers and companies only see approved projects (unless filtering by status)
     // Admin sees all projects (including rejected)
-    if (req.user.role === "engineer" && !status) {
+    if ((req.user.role === "engineer" || req.user.role === "company") && !status) {
       filters["adminApproval.status"] = "approved";
-      filters.status = { $ne: "Rejected" }; // المهندسين لا يرون المشاريع المرفوضة
+      filters.status = { $ne: "Rejected" }; // المهندسين والشركات لا يرون المشاريع المرفوضة
     }
 
     // Combine all conditions using $and if needed
@@ -196,8 +196,8 @@ exports.getProjects = async (req, res, next) => {
     let projects;
     let total;
 
-    if (req.user.role === "engineer" && req.user.country) {
-      // For engineers: fetch all matching projects, then sort by location priority
+    if ((req.user.role === "engineer" || req.user.role === "company") && req.user.country) {
+      // For engineers and companies: fetch all matching projects, then sort by location priority
       const allProjects = await Project.find(filters)
         .populate("client", "name email")
         .populate("assignedEngineer", "name email")
@@ -266,7 +266,7 @@ exports.getProjectById = async (req, res, next) => {
       return res.status(403).json({ message: "غير مصرح لك بالوصول لهذا المشروع" });
     }
 
-    if (req.user.role === "engineer") {
+    if (req.user.role === "engineer" || req.user.role === "company") {
       const isAssigned = project.assignedEngineer && project.assignedEngineer._id.toString() === req.user._id.toString();
       const isAvailable = project.status === "Waiting for Engineers" || project.status === "Pending Review";
       if (!isAssigned && !isAvailable) {
@@ -282,14 +282,14 @@ exports.getProjectById = async (req, res, next) => {
       pending: 0,
       accepted: 0,
       rejected: 0,
-      myProposal: null, // For engineers: their proposal if exists
+      myProposal: null, // For engineers and companies: their proposal if exists
     };
 
     try {
       const proposalFilters = { project: project._id };
       
-      // Engineers only see their own proposal count/details
-      if (req.user.role === "engineer") {
+      // Engineers and companies only see their own proposal count/details
+      if (req.user.role === "engineer" || req.user.role === "company") {
         proposalFilters.engineer = req.user._id;
         const myProposal = await Proposal.findOne(proposalFilters)
           .populate("engineer", "name email avatar")
@@ -1105,7 +1105,7 @@ exports.getProjectStatistics = async (req, res, next) => {
 
     if (req.user.role === "client") {
       filters.client = req.user._id;
-    } else if (req.user.role === "engineer") {
+    } else if (req.user.role === "engineer" || req.user.role === "company") {
       filters.assignedEngineer = req.user._id;
     }
 

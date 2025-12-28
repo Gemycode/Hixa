@@ -48,7 +48,7 @@ const registerCompany = async (req, res) => {
       email,
       password,
       name: companyName, // استخدام companyName كاسم الشركة
-      role: "client", // الشركات تعتبر clients
+      role: "company", // الشركات لها role منفصل
       phone: "", // يمكن إضافته لاحقاً
     });
 

@@ -13,8 +13,8 @@ const {
   deleteWork,
 } = require("../controllers/portfolioController");
 
-// حماية لمسارات المهندسين والإدمن
-const engineerOrAdmin = [protect, restrictTo("engineer", "admin")];
+// حماية لمسارات المهندسين والشركات والإدمن
+const engineerOrAdmin = [protect, restrictTo("engineer", "company", "admin")];
 
 // إنشاء عمل جديد
 router.post(

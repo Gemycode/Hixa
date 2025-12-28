@@ -17,11 +17,11 @@ const sanitizeProposal = (proposal, userRole = null) => {
     // Clone project to avoid mutating original
     project = { ...project };
     
-    // Hide sensitive admin information from engineers
-    if (userRole === "engineer" && project.adminApproval) {
+    // Hide sensitive admin information from engineers and companies
+    if ((userRole === "engineer" || userRole === "company") && project.adminApproval) {
       project.adminApproval = {
         status: project.adminApproval.status, // فقط حالة الموافقة
-        // لا نعرض reviewedBy, reviewedAt, rejectionReason للمهندسين
+        // لا نعرض reviewedBy, reviewedAt, rejectionReason للمهندسين والشركات
       };
     }
   }
@@ -40,13 +40,13 @@ const sanitizeProposal = (proposal, userRole = null) => {
   };
 };
 
-// Engineer submits proposal on a project
+// Engineer or Company submits proposal on a project
 exports.createProposal = async (req, res, next) => {
   try {
     const { projectId, description, estimatedTimeline, relevantExperience, proposedBudget } = req.body;
 
-    if (req.user.role !== "engineer") {
-      return res.status(403).json({ message: "هذه العملية للمهندسين فقط" });
+    if (req.user.role !== "engineer" && req.user.role !== "company") {
+      return res.status(403).json({ message: "هذه العملية للمهندسين والشركات فقط" });
     }
 
     const project = await Project.findById(projectId);
@@ -67,7 +67,7 @@ exports.createProposal = async (req, res, next) => {
       });
     }
 
-    // Ensure no duplicate proposal for same project/engineer
+    // Ensure no duplicate proposal for same project/engineer or company
     const existing = await Proposal.findOne({ project: projectId, engineer: req.user._id });
     if (existing) {
       return res.status(400).json({ message: "لقد قدمت عرضاً لهذا المشروع بالفعل" });
@@ -75,7 +75,7 @@ exports.createProposal = async (req, res, next) => {
 
     const proposal = await Proposal.create({
       project: projectId,
-      engineer: req.user._id,
+      engineer: req.user._id, // engineer field can also store company ID
       description,
       estimatedTimeline,
       relevantExperience,
@@ -102,34 +102,35 @@ exports.createProposal = async (req, res, next) => {
         console.log(`ℹ️  ProjectRoom already exists for project ${projectId}`, projectRoom._id);
       }
 
-      // Check if ChatRoom between Admin and Engineer already exists
+      // Check if ChatRoom between Admin and Engineer/Company already exists
+      const chatRoomType = req.user.role === "company" ? "admin-company" : "admin-engineer";
       let adminEngineerChatRoom = await ChatRoom.findOne({
         project: projectId,
         projectRoom: projectRoom._id,
-        type: "admin-engineer",
+        type: chatRoomType,
         engineer: req.user._id,
       });
 
       if (!adminEngineerChatRoom) {
-        // Create ChatRoom for Admin-Engineer communication
+        // Create ChatRoom for Admin-Engineer/Company communication
         adminEngineerChatRoom = await ChatRoom.create({
           project: projectId,
           projectRoom: projectRoom._id,
-          type: "admin-engineer",
+          type: chatRoomType,
           engineer: req.user._id,
           participants: [
             {
               user: req.user._id,
-              role: "engineer",
+              role: req.user.role, // "engineer" or "company"
               joinedAt: new Date(),
             },
             // Admin will be added when they join the chat
           ],
         });
         
-        console.log(`✅ Created Admin-Engineer ChatRoom for project ${projectId}`, adminEngineerChatRoom._id);
+        console.log(`✅ Created Admin-${req.user.role === "company" ? "Company" : "Engineer"} ChatRoom for project ${projectId}`, adminEngineerChatRoom._id);
       } else {
-        console.log(`ℹ️  Admin-Engineer ChatRoom already exists for project ${projectId}`, adminEngineerChatRoom._id);
+        console.log(`ℹ️  Admin-${req.user.role === "company" ? "Company" : "Engineer"} ChatRoom already exists for project ${projectId}`, adminEngineerChatRoom._id);
       }
 
       // Check if ChatRoom between Admin and Client already exists
@@ -175,12 +176,13 @@ exports.createProposal = async (req, res, next) => {
         await adminClientChatRoom.save();
       }
 
-      // Send system message in Admin-Engineer ChatRoom
+      // Send system message in Admin-Engineer/Company ChatRoom
+      const userType = req.user.role === "company" ? "الشركة" : "المهندس";
       const systemUserId = await getSystemUserId();
       const systemMessageEngineer = await Message.create({
         chatRoom: adminEngineerChatRoom._id,
         sender: systemUserId,
-        content: `قام المهندس ${req.user.name || 'مجهول'} بتقديم عرض على المشروع "${project.title}". يرجى التواصل معه لإجراء مقابلة.`,
+        content: `قام ${userType} ${req.user.name || 'مجهول'} بتقديم عرض على المشروع "${project.title}". يرجى التواصل معه لإجراء مقابلة.`,
         type: "system",
       });
       
@@ -201,12 +203,13 @@ exports.createProposal = async (req, res, next) => {
         // Notify Admin about new proposal
         const adminUsers = await User.find({ role: "admin", isActive: true }).select("_id");
         if (adminUsers.length > 0) {
+          const userType = req.user.role === "company" ? "الشركة" : "المهندس";
           const adminNotificationPromises = adminUsers.map(admin =>
             createNotification({
               user: admin._id,
               type: "proposal_submitted",
               title: "عرض جديد",
-              message: `المهندس ${req.user.name || 'مجهول'} قدم عرضاً على المشروع "${project.title}"`,
+              message: `${userType} ${req.user.name || 'مجهول'} قدم عرضاً على المشروع "${project.title}"`,
               data: {
                 projectId: project._id,
                 proposalId: proposal._id,
@@ -249,13 +252,13 @@ exports.getProposalsByProject = async (req, res, next) => {
       return res.status(404).json({ message: "المشروع غير موجود" });
     }
 
-    // Permission: admin sees all, client sees their project, engineer sees only own proposal
+    // Permission: admin sees all, client sees their project, engineer/company sees only own proposal
     if (req.user.role === "client" && project.client.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: "غير مصرح لك بعرض عروض هذا المشروع" });
     }
 
     const filters = { project: projectId };
-    if (req.user.role === "engineer") {
+    if (req.user.role === "engineer" || req.user.role === "company") {
       filters.engineer = req.user._id;
     }
 
@@ -272,11 +275,11 @@ exports.getProposalsByProject = async (req, res, next) => {
   }
 };
 
-// Engineer: get own proposals
+// Engineer or Company: get own proposals
 exports.getMyProposals = async (req, res, next) => {
   try {
-    if (req.user.role !== "engineer") {
-      return res.status(403).json({ message: "هذه العملية للمهندسين فقط" });
+    if (req.user.role !== "engineer" && req.user.role !== "company") {
+      return res.status(403).json({ message: "هذه العملية للمهندسين والشركات فقط" });
     }
 
     const proposals = await Proposal.find({ engineer: req.user._id })
@@ -508,7 +511,7 @@ exports.updateProposal = async (req, res, next) => {
       return res.status(403).json({ message: "غير مسموح بتعديل هذا العرض" });
     }
 
-    // Engineer can update only within 1 hour of creation
+    // Engineer or Company can update only within 1 hour of creation
     if (!isAdmin) {
       const oneHourMs = 60 * 60 * 1000;
       const diff = Date.now() - new Date(proposal.createdAt).getTime();
@@ -558,7 +561,7 @@ exports.deleteProposal = async (req, res, next) => {
       return res.status(403).json({ message: "غير مسموح بحذف هذا العرض" });
     }
 
-    // Engineer can only delete pending proposals
+    // Engineer or Company can only delete pending proposals
     if (!isAdmin && proposal.status !== "pending") {
       return res.status(403).json({ message: "لا يمكن حذف العرض إلا إذا كان في حالة انتظار" });
     }

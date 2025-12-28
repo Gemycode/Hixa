@@ -25,25 +25,25 @@ const setProjectIdFromParams = (req, res, next) => {
 
 router.use(protect);
 
-// Engineer routes
+// Engineer and Company routes
 router.post(
   "/project/:projectId",
-  restrictTo("engineer"),
+  restrictTo("engineer", "company"),
   setProjectIdFromParams,
   validateProposalCreate,
   createProposal
 );
-router.post("/", restrictTo("engineer"), validateProposalCreate, createProposal);
-router.get("/my", restrictTo("engineer"), getMyProposals);
+router.post("/", restrictTo("engineer", "company"), validateProposalCreate, createProposal);
+router.get("/my", restrictTo("engineer", "company"), getMyProposals);
 
 // Project proposals
 router.get("/project/:projectId", getProposalsByProject);
 
 // Update proposals
-router.put("/:id", restrictTo("admin", "engineer"), validateProposalUpdate, updateProposal);
+router.put("/:id", restrictTo("admin", "engineer", "company"), validateProposalUpdate, updateProposal);
 router.put("/:id/status", restrictTo("admin"), validateProposalStatusUpdate, updateProposalStatus);
 
 // Delete proposal
-router.delete("/:id", restrictTo("admin", "engineer"), deleteProposal);
+router.delete("/:id", restrictTo("admin", "engineer", "company"), deleteProposal);
 
 module.exports = router;

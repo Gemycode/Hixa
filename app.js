@@ -48,15 +48,37 @@ app.use(helmet());
 // ================== FIXED CORS ==================
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      console.log("🌐 CORS: Request with no origin, allowing");
+      return callback(null, true);
+    }
 
     const allowedOrigins = [
       "https://hixa.com.sa",
       "https://www.hixa.com.sa",
-      "http://localhost:3000"
+      "http://localhost:3000",
+      "http://localhost:5173", // Vite dev server
+      "http://localhost:5174",
+      "http://127.0.0.1:3000",
+      "http://127.0.0.1:5173",
+      "http://127.0.0.1:5174",
     ];
 
+    console.log("🌐 CORS: Checking origin:", origin);
+    
     if (allowedOrigins.includes(origin)) {
+      console.log("✅ CORS: Origin allowed:", origin);
+      return callback(null, true);
+    }
+
+    // Log blocked origin for debugging
+    console.warn("🚫 CORS: Origin not allowed:", origin);
+    console.warn("🚫 CORS: Allowed origins:", allowedOrigins);
+    
+    // In development, allow all origins for easier debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.warn("⚠️ CORS: Development mode - allowing origin anyway");
       return callback(null, true);
     }
 
@@ -65,6 +87,8 @@ const corsOptions = {
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 86400, // 24 hours
 };
 
 app.use(cors(corsOptions));

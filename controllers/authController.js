@@ -12,7 +12,7 @@ const generateToken = (userId, role) => {
 // General register (backward compatibility)
 const register = async (req, res) => {
   try {
-    const { email, password, name, role } = req.body;
+    const { email, password, name, role, phone, countryCode } = req.body;
 
     if (await User.findOne({ email })) {
       return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
@@ -22,7 +22,9 @@ const register = async (req, res) => {
       email,
       password,
       name: name || email.split("@")[0],
-      role: role && role !== "admin" ? role : "customer"
+      role: role && role !== "admin" ? role : "customer",
+      phone: phone || "",
+      countryCode: countryCode || ""
     });
 
     const token = generateToken(user._id, user.role);
@@ -38,7 +40,7 @@ const register = async (req, res) => {
 // Register Company
 const registerCompany = async (req, res) => {
   try {
-    const { companyName, contactPersonName, email, password } = req.body;
+    const { companyName, contactPersonName, email, password, phone, countryCode } = req.body;
 
     if (await User.findOne({ email })) {
       return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
@@ -49,7 +51,8 @@ const registerCompany = async (req, res) => {
       password,
       name: companyName, // استخدام companyName كاسم الشركة
       role: "company", // الشركات لها role منفصل
-      phone: "", // يمكن إضافته لاحقاً
+      phone: phone || "",
+      countryCode: countryCode || "",
     });
 
     // يمكن حفظ contactPersonName في bio أو حقل آخر
@@ -83,7 +86,7 @@ const registerCompany = async (req, res) => {
 // Register Engineer
 const registerEngineer = async (req, res) => {
   try {
-    const { fullName, specialization, licenseNumber, email, password } = req.body;
+    const { fullName, specialization, licenseNumber, email, password, phone, countryCode } = req.body;
 
     if (await User.findOne({ email })) {
       return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
@@ -99,6 +102,8 @@ const registerEngineer = async (req, res) => {
       password,
       name: fullName,
       role: "engineer",
+      phone: phone || "",
+      countryCode: countryCode || "",
       nationalId: licenseNumber || undefined, // استخدام nationalId لحفظ licenseNumber
       specializations: specialization ? [specialization] : [], // حفظ specialization
     });
@@ -131,7 +136,7 @@ const registerEngineer = async (req, res) => {
 // Register Client
 const registerClient = async (req, res) => {
   try {
-    const { fullName, email, password } = req.body;
+    const { fullName, email, password, phone, countryCode } = req.body;
 
     if (await User.findOne({ email })) {
       return res.status(409).json({ message: "البريد الإلكتروني مستخدم بالفعل" });
@@ -142,6 +147,8 @@ const registerClient = async (req, res) => {
       password,
       name: fullName,
       role: "client",
+      phone: phone || "",
+      countryCode: countryCode || "",
     });
 
     const token = generateToken(user._id, user.role);

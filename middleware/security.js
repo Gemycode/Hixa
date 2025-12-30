@@ -21,10 +21,12 @@ const corsOptions = {
   maxAge: 600, // 10 minutes
 };
 
-// Rate limiting for API routes (100 requests per 15 minutes)
+// Rate limiting for API routes
+// In development: 1000 requests per 15 minutes (more lenient for testing)
+// In production: 100 requests per 15 minutes
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: process.env.NODE_ENV === 'development' ? 1000 : 100, // More lenient in development
   message: 'تم تجاوز الحد المسموح من الطلبات. يرجى المحاولة بعد 15 دقيقة',
   handler: (req, res, next, options) => {
     throw new RateLimitExceededError(options.message);

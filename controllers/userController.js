@@ -40,7 +40,7 @@ const { uploadToCloudinary } = require("../middleware/upload");
 
 const updateProfile = async (req, res, next) => {
   try {
-    const { name, email, phone, country, city, location, bio, specializations, certifications } = req.body;
+    const { name, email, phone, countryCode, country, city, location, bio, specializations, certifications } = req.body;
 
     const user = await User.findById(req.user._id);
     if (!user) {
@@ -50,6 +50,7 @@ const updateProfile = async (req, res, next) => {
     if (typeof name !== "undefined") user.name = name;
     if (typeof email !== "undefined") user.email = email;
     if (typeof phone !== "undefined") user.phone = phone;
+    if (typeof countryCode !== "undefined") user.countryCode = countryCode;
     if (typeof country !== "undefined") user.country = country;
     if (typeof city !== "undefined") user.city = city;
     if (typeof location !== "undefined") user.location = location;

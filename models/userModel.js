@@ -8,6 +8,7 @@ const UserSchema = new mongoose.Schema(
     role: { type: String, enum: ["admin", "engineer", "client", "company", "customer"], default: "customer" },
     name: { type: String, trim: true },
     phone: { type: String, trim: true, maxlength: 50 },
+    countryCode: { type: String, trim: true, maxlength: 10 }, // كود البلد للجوال (مثل +966, +971)
     nationalId: { type: String, trim: true, maxlength: 20, unique: true, sparse: true }, // الرقم القومي
     // Location fields
     country: {

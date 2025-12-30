@@ -87,6 +87,18 @@ const registerRules = [
     })
     .withMessage('يجب أن تحتوي كلمة المرور على 8 أحرف على الأقل، حرف كبير، حرف صغير، ورقم واحد على الأقل'),
   
+  body('phone')
+    .notEmpty().withMessage('رقم الهاتف مطلوب')
+    .trim()
+    .isLength({ min: 5, max: 50 })
+    .withMessage('رقم الهاتف يجب أن يكون بين 5 و 50 حرف'),
+  
+  body('countryCode')
+    .notEmpty().withMessage('كود البلد مطلوب')
+    .trim()
+    .isLength({ min: 1, max: 10 })
+    .withMessage('كود البلد يجب أن يكون بين 1 و 10 أحرف'),
+  
   body('name')
     .optional()
     .trim()
@@ -391,7 +403,26 @@ const workStatuses = ["Pending Review", "In Progress", "Completed"];
 const validateWork = (req, res, next) => {
   const schema = Joi.object({
     title: Joi.string().trim().max(200).required(),
-    category: Joi.string().trim().max(100).required(),
+    category: Joi.string().trim().max(100).valid(
+      "المقاولات العامة",
+      "التطوير والتسويق العقاري",
+      "الأعمال الإنشائية",
+      "خدمات هندسية وتصاميم معمارية وديكور",
+      "الإشراف على المشاريع والاستشارات الهندسية",
+      "المواد والمنتجات الهندسية",
+      "أعمال العظم",
+      "الأعمال المعمارية والتشطيبات",
+      "أعمال الفرش والديكور",
+      "الأعمال الكهروميكانيكية (MEP)",
+      "أعمال الطرق والبنية التحتية",
+      "أعمال اللاندسكيب والموقع العام",
+      "أعمال الألمنيوم والمعدنية والخشبية",
+      "أعمال العزل والحماية",
+      "أعمال المسابح والمسطحات المائية",
+      "أعمال التشغيل والصيانة والتسليم"
+    ).required().messages({
+      "any.only": "نطاق الأعمال غير صحيح",
+    }),
     date: Joi.date().required(),
     description: Joi.string().trim().max(5000).required(),
     location: Joi.string().trim().max(200).optional(),
@@ -416,7 +447,26 @@ const validateWork = (req, res, next) => {
 const validateWorkUpdate = (req, res, next) => {
   const schema = Joi.object({
     title: Joi.string().trim().max(200).optional(),
-    category: Joi.string().trim().max(100).optional(),
+    category: Joi.string().trim().max(100).valid(
+      "المقاولات العامة",
+      "التطوير والتسويق العقاري",
+      "الأعمال الإنشائية",
+      "خدمات هندسية وتصاميم معمارية وديكور",
+      "الإشراف على المشاريع والاستشارات الهندسية",
+      "المواد والمنتجات الهندسية",
+      "أعمال العظم",
+      "الأعمال المعمارية والتشطيبات",
+      "أعمال الفرش والديكور",
+      "الأعمال الكهروميكانيكية (MEP)",
+      "أعمال الطرق والبنية التحتية",
+      "أعمال اللاندسكيب والموقع العام",
+      "أعمال الألمنيوم والمعدنية والخشبية",
+      "أعمال العزل والحماية",
+      "أعمال المسابح والمسطحات المائية",
+      "أعمال التشغيل والصيانة والتسليم"
+    ).optional().messages({
+      "any.only": "نطاق الأعمال غير صحيح",
+    }),
     date: Joi.date().optional(),
     description: Joi.string().trim().max(5000).optional(),
     location: Joi.string().trim().max(200).optional(),
@@ -597,7 +647,26 @@ const validateProject = (req, res, next) => {
     location: Joi.string().trim().max(200).optional().messages({
       "string.max": "الموقع يجب ألا يتجاوز 200 حرف",
     }),
-    category: Joi.string().trim().max(100).optional(),
+    category: Joi.string().trim().max(100).valid(
+      "المقاولات العامة",
+      "التطوير والتسويق العقاري",
+      "الأعمال الإنشائية",
+      "خدمات هندسية وتصاميم معمارية وديكور",
+      "الإشراف على المشاريع والاستشارات الهندسية",
+      "المواد والمنتجات الهندسية",
+      "أعمال العظم",
+      "الأعمال المعمارية والتشطيبات",
+      "أعمال الفرش والديكور",
+      "الأعمال الكهروميكانيكية (MEP)",
+      "أعمال الطرق والبنية التحتية",
+      "أعمال اللاندسكيب والموقع العام",
+      "أعمال الألمنيوم والمعدنية والخشبية",
+      "أعمال العزل والحماية",
+      "أعمال المسابح والمسطحات المائية",
+      "أعمال التشغيل والصيانة والتسليم"
+    ).optional().messages({
+      "any.only": "نطاق الأعمال غير صحيح",
+    }),
     requirements: Joi.string().trim().max(5000).optional(),
     projectType: Joi.string()
       .valid(
@@ -648,7 +717,26 @@ const validateProjectUpdate = (req, res, next) => {
       "string.max": "المدينة يجب ألا تتجاوز 100 حرف",
     }),
     location: Joi.string().trim().max(200).optional(),
-    category: Joi.string().trim().max(100).optional(),
+    category: Joi.string().trim().max(100).valid(
+      "المقاولات العامة",
+      "التطوير والتسويق العقاري",
+      "الأعمال الإنشائية",
+      "خدمات هندسية وتصاميم معمارية وديكور",
+      "الإشراف على المشاريع والاستشارات الهندسية",
+      "المواد والمنتجات الهندسية",
+      "أعمال العظم",
+      "الأعمال المعمارية والتشطيبات",
+      "أعمال الفرش والديكور",
+      "الأعمال الكهروميكانيكية (MEP)",
+      "أعمال الطرق والبنية التحتية",
+      "أعمال اللاندسكيب والموقع العام",
+      "أعمال الألمنيوم والمعدنية والخشبية",
+      "أعمال العزل والحماية",
+      "أعمال المسابح والمسطحات المائية",
+      "أعمال التشغيل والصيانة والتسليم"
+    ).optional().messages({
+      "any.only": "نطاق الأعمال غير صحيح",
+    }),
     requirements: Joi.string().trim().max(5000).optional(),
     projectType: Joi.string()
       .valid(
@@ -764,10 +852,21 @@ const validateProposalUpdate = (req, res, next) => {
 
 // Profile update validation (for /me) - safer, excludes role/isActive/password
 const validateProfileUpdate = (req, res, next) => {
+  // Allow file upload only (avatar) - if file exists, skip body validation
+  if (req.file) {
+    // If file is present, allow empty body or validate body if present
+    if (Object.keys(req.body || {}).length === 0) {
+      // Only file upload, no body fields - this is valid
+      return next();
+    }
+  }
+
+  // Validate body fields if present
   const schema = Joi.object({
     email: Joi.string().pattern(emailRegex),
     name: Joi.string().trim().max(100),
     phone: Joi.string().trim().max(50),
+    countryCode: Joi.string().trim().max(10).optional(),
     country: Joi.string().trim().max(100).optional(),
     city: Joi.string().trim().max(100).optional(),
     location: Joi.string().trim().max(200).optional(),
@@ -817,6 +916,18 @@ const validateRegisterCompany = (req, res, next) => {
     email: Joi.string().email({ tlds: { allow: false } }).required().messages({
       "string.email": "البريد الإلكتروني غير صحيح",
       "any.required": "البريد الإلكتروني مطلوب",
+    }),
+    phone: Joi.string().trim().min(5).max(50).required().messages({
+      "string.empty": "رقم الهاتف مطلوب",
+      "string.min": "رقم الهاتف يجب أن يكون 5 أحرف على الأقل",
+      "string.max": "رقم الهاتف يجب ألا يتجاوز 50 حرف",
+      "any.required": "رقم الهاتف مطلوب",
+    }),
+    countryCode: Joi.string().trim().min(1).max(10).required().messages({
+      "string.empty": "كود البلد مطلوب",
+      "string.min": "كود البلد يجب أن يكون حرف واحد على الأقل",
+      "string.max": "كود البلد يجب ألا يتجاوز 10 أحرف",
+      "any.required": "كود البلد مطلوب",
     }),
     password: Joi.string()
       .min(8)
@@ -869,6 +980,18 @@ const validateRegisterEngineer = (req, res, next) => {
       "string.email": "البريد الإلكتروني غير صحيح",
       "any.required": "البريد الإلكتروني مطلوب",
     }),
+    phone: Joi.string().trim().min(5).max(50).required().messages({
+      "string.empty": "رقم الهاتف مطلوب",
+      "string.min": "رقم الهاتف يجب أن يكون 5 أحرف على الأقل",
+      "string.max": "رقم الهاتف يجب ألا يتجاوز 50 حرف",
+      "any.required": "رقم الهاتف مطلوب",
+    }),
+    countryCode: Joi.string().trim().min(1).max(10).required().messages({
+      "string.empty": "كود البلد مطلوب",
+      "string.min": "كود البلد يجب أن يكون حرف واحد على الأقل",
+      "string.max": "كود البلد يجب ألا يتجاوز 10 أحرف",
+      "any.required": "كود البلد مطلوب",
+    }),
     password: Joi.string()
       .min(8)
       .pattern(passwordRegex)
@@ -908,6 +1031,18 @@ const validateRegisterClient = (req, res, next) => {
     email: Joi.string().email({ tlds: { allow: false } }).required().messages({
       "string.email": "البريد الإلكتروني غير صحيح",
       "any.required": "البريد الإلكتروني مطلوب",
+    }),
+    phone: Joi.string().trim().min(5).max(50).required().messages({
+      "string.empty": "رقم الهاتف مطلوب",
+      "string.min": "رقم الهاتف يجب أن يكون 5 أحرف على الأقل",
+      "string.max": "رقم الهاتف يجب ألا يتجاوز 50 حرف",
+      "any.required": "رقم الهاتف مطلوب",
+    }),
+    countryCode: Joi.string().trim().min(1).max(10).required().messages({
+      "string.empty": "كود البلد مطلوب",
+      "string.min": "كود البلد يجب أن يكون حرف واحد على الأقل",
+      "string.max": "كود البلد يجب ألا يتجاوز 10 أحرف",
+      "any.required": "كود البلد مطلوب",
     }),
     password: Joi.string()
       .min(8)

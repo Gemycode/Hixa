@@ -112,7 +112,7 @@ exports.getProjects = async (req, res, next) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
     const skip = (page - 1) * limit;
 
-    const { status, projectType, search, city, country } = req.query;
+    const { status, projectType, search, city, country, category } = req.query;
 
     // Build filters based on user role
     const filters = {};
@@ -142,6 +142,11 @@ exports.getProjects = async (req, res, next) => {
     // Project type filter
     if (projectType) {
       filters.projectType = projectType;
+    }
+
+    // Category filter (نطاق الأعمال)
+    if (category) {
+      filters.category = category;
     }
 
     // Location filters (country and city)

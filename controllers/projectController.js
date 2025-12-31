@@ -123,10 +123,10 @@ exports.getProjects = async (req, res, next) => {
       // Clients only see their own projects
       filters.client = req.user._id;
     } else if (req.user.role === "engineer" || req.user.role === "company") {
-      // Engineers and companies see projects assigned to them or available projects
+      // Engineers and companies see all projects assigned to them (regardless of status) or available projects
       andConditions.push({
         $or: [
-          { assignedEngineer: req.user._id },
+          { assignedEngineer: req.user._id }, // All assigned projects regardless of status
           { status: "Waiting for Engineers" },
           { status: "Pending Review" },
         ],
@@ -197,48 +197,20 @@ exports.getProjects = async (req, res, next) => {
     }
     // Admin و Client يرون جميع المشاريع (لا حاجة لفلتر إضافي)
 
-    // Get all projects first (for engineers we need to sort by location priority)
+    // Get all projects - sort by creation date (newest first) for all users
     let projects;
     let total;
 
-    if ((req.user.role === "engineer" || req.user.role === "company") && req.user.country) {
-      // For engineers and companies: fetch all matching projects, then sort by location priority
-      const allProjects = await Project.find(filters)
+    [projects, total] = await Promise.all([
+      Project.find(filters)
         .populate("client", "name email")
         .populate("assignedEngineer", "name email")
-        .populate("adminApproval.reviewedBy", "name email");
-
-      // Sort by location priority
-      const sortedProjects = allProjects.sort((a, b) => {
-        // Priority 1: Same city (if engineer has city)
-        if (req.user.city) {
-          const aCityMatch = a.city === req.user.city ? 1 : 0;
-          const bCityMatch = b.city === req.user.city ? 1 : 0;
-          if (aCityMatch !== bCityMatch) return bCityMatch - aCityMatch;
-        }
-        // Priority 2: Same country
-        const aCountryMatch = (a.country || "").toString() === (req.user.country || "").toString() ? 1 : 0;
-        const bCountryMatch = (b.country || "").toString() === (req.user.country || "").toString() ? 1 : 0;
-        if (aCountryMatch !== bCountryMatch) return bCountryMatch - aCountryMatch;
-        // Priority 3: Newest first
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      });
-
-      total = sortedProjects.length;
-      projects = sortedProjects.slice(skip, skip + limit);
-    } else {
-      // For clients and admins: normal query with pagination
-      [projects, total] = await Promise.all([
-        Project.find(filters)
-          .populate("client", "name email")
-          .populate("assignedEngineer", "name email")
-          .populate("adminApproval.reviewedBy", "name email")
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit),
-        Project.countDocuments(filters),
-      ]);
-    }
+        .populate("adminApproval.reviewedBy", "name email")
+        .sort({ createdAt: -1 }) // Sort by creation date: newest first
+        .skip(skip)
+        .limit(limit),
+      Project.countDocuments(filters),
+    ]);
 
     res.json({
       data: projects.map(sanitizeProject),

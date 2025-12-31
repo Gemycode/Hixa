@@ -14,7 +14,7 @@ const ChatRoomSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["admin-engineer", "admin-client", "group"],
+      enum: ["admin-engineer", "admin-company", "admin-client", "group"],
       required: true,
     },
     // للمساعدة في التصفية والبحث
@@ -38,7 +38,7 @@ const ChatRoomSchema = new mongoose.Schema(
         },
         role: {
           type: String,
-          enum: ["admin", "engineer", "client"],
+          enum: ["admin", "engineer", "company", "client"],
           required: true,
         },
         joinedAt: {

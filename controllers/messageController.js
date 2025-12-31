@@ -53,7 +53,24 @@ const sendMessage = async (req, res, next) => {
       p => p.user.toString() === senderId.toString()
     );
 
-    if (!isParticipant && req.user.role !== 'admin') {
+    // For engineers and companies, also check if they are the engineer/company in the chat room
+    const isEngineerOrCompany = (req.user.role === 'engineer' || req.user.role === 'company') &&
+      chatRoom.engineer &&
+      chatRoom.engineer.toString() === senderId.toString();
+
+    // If engineer/company is in engineer field but not in participants, add them
+    if (isEngineerOrCompany && !isParticipant) {
+      console.log('➕ Adding engineer/company to participants:', senderId);
+      chatRoom.participants.push({
+        user: senderId,
+        role: req.user.role, // "engineer" or "company"
+        joinedAt: new Date(),
+      });
+      await chatRoom.save({ session });
+      console.log('✅ Engineer/company added to participants');
+    }
+
+    if (!isParticipant && !isEngineerOrCompany && req.user.role !== 'admin') {
       throw new ForbiddenError('غير مصرح لك بإرسال رسائل في هذه الغرفة');
     }
 

@@ -54,6 +54,13 @@ exports.createProposal = async (req, res, next) => {
       return res.status(404).json({ message: "المشروع غير موجود" });
     }
 
+    // Check if project is cancelled
+    if (project.status === "Cancelled") {
+      return res.status(400).json({ 
+        message: "لا يمكن تقديم عروض على هذا المشروع. تم إلغاء المشروع من قبل العميل" 
+      });
+    }
+
     // Check if project is approved and waiting for engineers
     if (project.status !== "Waiting for Engineers") {
       return res.status(400).json({ 

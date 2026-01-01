@@ -6,6 +6,7 @@ const {
   getProjects,
   getProjectById,
   updateProject,
+  cancelProject,
   deleteProject,
   hardDeleteProject,
   duplicateProject,
@@ -42,6 +43,7 @@ router.post("/", restrictTo("client"), validateProject, createProject);
 
 // Update/delete project
 router.put("/:id", validateProjectUpdate, updateProject);
+router.patch("/:id/cancel", cancelProject); // Cancel project (Client can cancel their own projects)
 router.delete("/:id", deleteProject); // Soft delete
 router.delete("/:id/hard", restrictTo("admin"), hardDeleteProject); // Hard delete (Admin only)
 router.post("/:id/duplicate", duplicateProject); // Duplicate project

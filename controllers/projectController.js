@@ -112,7 +112,7 @@ exports.getProjects = async (req, res, next) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
     const skip = (page - 1) * limit;
 
-    const { status, projectType, search, city, country, category } = req.query;
+    const { status, projectType, search, city, country, category, browseOnly } = req.query;
 
     // Build filters based on user role
     const filters = {};
@@ -120,15 +120,51 @@ exports.getProjects = async (req, res, next) => {
 
     // Role-based filters
     if (req.user.role === "client") {
-      // Clients only see their own projects
-      filters.client = req.user._id;
+      // Check if this is a "browse only" request (for browse projects page)
+      // Handle both string "true" and boolean true
+      const isBrowseOnly = browseOnly === "true" || browseOnly === true || browseOnly === "1";
+      
+      console.log("🔍 Client request details:", {
+        userId: req.user._id,
+        browseOnly: browseOnly,
+        isBrowseOnly: isBrowseOnly,
+        allQueryParams: req.query,
+      });
+      
+      if (isBrowseOnly) {
+        // For "Browse Projects" page: Only show public approved projects (NOT own projects)
+        // Public projects: approved and in specific statuses (Waiting for Engineers, In Progress, Completed)
+        // Exclude cancelled and rejected projects
+        andConditions.push({
+          $and: [
+            { client: { $ne: req.user._id } }, // Exclude own projects
+            { "adminApproval.status": "approved" }, // Must be approved
+            { status: { $in: ["Waiting for Engineers", "In Progress", "Completed"] } }, // Only these statuses
+            { status: { $nin: ["Cancelled", "Rejected"] } }, // Exclude cancelled and rejected
+          ],
+        });
+        console.log("🔍 Client browse-only filter applied (public projects only):", {
+          userId: req.user._id,
+          excludesOwnProjects: true,
+          requiresApproval: true,
+          allowedStatuses: ["Waiting for Engineers", "In Progress", "Completed"],
+        });
+      } else {
+        // For "My Projects" page: Show ONLY own projects (not public projects)
+        filters.client = req.user._id;
+        console.log("🔍 Client filter applied (own projects only):", {
+          userId: req.user._id,
+          includesOwnProjects: true,
+          includesPublicProjects: false,
+        });
+      }
     } else if (req.user.role === "engineer" || req.user.role === "company") {
       // Engineers and companies see all projects assigned to them (regardless of status) or available projects
+      // Show cancelled projects too (but they won't be available for proposals)
       andConditions.push({
         $or: [
-          { assignedEngineer: req.user._id }, // All assigned projects regardless of status
-          { status: "Waiting for Engineers" },
-          { status: "Pending Review" },
+          { assignedEngineer: req.user._id }, // All assigned projects regardless of status (including cancelled)
+          { status: { $in: ["Waiting for Engineers", "Pending Review", "Cancelled"] } }, // Show cancelled projects too
         ],
       });
     }
@@ -183,12 +219,12 @@ exports.getProjects = async (req, res, next) => {
     // Only show active projects
     filters.isActive = true;
 
-    // Clients see all their projects (including rejected)
-    // Engineers and companies only see approved projects (unless filtering by status)
-    // Admin sees all projects (including rejected)
+    // Clients see all their projects (including rejected and cancelled)
+    // Engineers and companies see approved projects (including cancelled - but cancelled won't accept proposals)
+    // Admin sees all projects (including rejected and cancelled)
     if ((req.user.role === "engineer" || req.user.role === "company") && !status) {
       filters["adminApproval.status"] = "approved";
-      filters.status = { $ne: "Rejected" }; // المهندسين والشركات لا يرون المشاريع المرفوضة
+      filters.status = { $ne: "Rejected" }; // المهندسين والشركات لا يرون المشاريع المرفوضة (لكن يرون الملغية للتوثيق)
     }
 
     // Combine all conditions using $and if needed
@@ -196,6 +232,17 @@ exports.getProjects = async (req, res, next) => {
       filters.$and = andConditions;
     }
     // Admin و Client يرون جميع المشاريع (لا حاجة لفلتر إضافي)
+
+    // Log final filters for debugging
+    if (req.user.role === "client") {
+      console.log("🔍 Final filters for client:", JSON.stringify(filters, null, 2));
+      console.log("🔍 Query params:", {
+        browseOnly: browseOnly,
+        page: page,
+        limit: limit,
+        skip: skip,
+      });
+    }
 
     // Get all projects - sort by creation date (newest first) for all users
     let projects;
@@ -211,6 +258,22 @@ exports.getProjects = async (req, res, next) => {
         .limit(limit),
       Project.countDocuments(filters),
     ]);
+
+    // Log results for debugging
+    if (req.user.role === "client") {
+      console.log("📊 Client projects query results:", {
+        total,
+        projectsCount: projects.length,
+        statuses: projects.map((p) => ({
+          id: p._id,
+          title: p.title,
+          status: p.status,
+          adminApproval: p.adminApproval?.status,
+          client: p.client?._id?.toString(),
+          isOwnProject: p.client?._id?.toString() === req.user._id.toString(),
+        })),
+      });
+    }
 
     res.json({
       data: projects.map(sanitizeProject),
@@ -592,6 +655,65 @@ exports.updateProject = async (req, res, next) => {
 
     res.json({
       message: "تم تحديث المشروع بنجاح",
+      data: sanitizeProject(project),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// CANCEL project (Client can cancel their own projects, Admin can cancel any project)
+exports.cancelProject = async (req, res, next) => {
+  try {
+    const project = await Project.findById(req.params.id);
+
+    if (!project) {
+      return res.status(404).json({ message: "المشروع غير موجود" });
+    }
+
+    // Check permissions - client can cancel their own projects, admin can cancel any project
+    if (req.user.role === "admin") {
+      // Admin can cancel any project
+    } else if (req.user.role === "client" && project.client.toString() === req.user._id.toString()) {
+      // Client can cancel their own projects
+    } else {
+      return res.status(403).json({ message: "غير مصرح لك بإلغاء هذا المشروع" });
+    }
+
+    // Check if project can be cancelled (not already completed or cancelled)
+    if (project.status === "Completed") {
+      return res.status(400).json({ message: "لا يمكن إلغاء مشروع مكتمل" });
+    }
+    
+    if (project.status === "Cancelled") {
+      return res.status(400).json({ message: "المشروع ملغي بالفعل" });
+    }
+
+    // Update project status to Cancelled
+    const oldStatus = project.status;
+    project.status = "Cancelled";
+    
+    // Add to status history with cancellation info
+    const cancellationReason = req.user.role === "admin" 
+      ? "تم الإلغاء من قبل الأدمن"
+      : "تم الإلغاء من قبل العميل";
+    
+    project.statusHistory.push({
+      status: "Cancelled",
+      changedBy: req.user._id,
+      changedAt: new Date(),
+      reason: cancellationReason,
+      cancelledBy: req.user.role, // Mark who cancelled it (admin or client)
+    });
+
+    // Keep isActive = true so project remains visible for documentation
+    // But it won't be available for proposals (filtered by status)
+    // project.isActive remains true
+    
+    await project.save();
+
+    res.json({
+      message: "تم إلغاء المشروع بنجاح",
       data: sanitizeProject(project),
     });
   } catch (error) {

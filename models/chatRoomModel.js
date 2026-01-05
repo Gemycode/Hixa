@@ -55,6 +55,17 @@ const ChatRoomSchema = new mongoose.Schema(
       enum: ["active", "archived"],
       default: "active",
     },
+    // Admin started chat flag - determines if admin has initiated conversation
+    // ChatRooms are hidden from engineer/client until admin starts the chat
+    adminStartedChat: {
+      type: Boolean,
+      default: false,
+    },
+    // Admin observer mode - for group chats, admin can observe but not participate
+    adminObserver: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

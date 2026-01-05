@@ -120,18 +120,20 @@ exports.createProposal = async (req, res, next) => {
 
       if (!adminEngineerChatRoom) {
         // Create ChatRoom for Admin-Engineer/Company communication
+        // adminStartedChat: false - ChatRoom hidden from engineer until admin starts chat
         adminEngineerChatRoom = await ChatRoom.create({
           project: projectId,
           projectRoom: projectRoom._id,
           type: chatRoomType,
           engineer: req.user._id,
+          adminStartedChat: false, // Admin hasn't started chat yet
           participants: [
             {
               user: req.user._id,
               role: req.user.role, // "engineer" or "company"
               joinedAt: new Date(),
             },
-            // Admin will be added when they join the chat
+            // Admin will be added when they start the chat
           ],
         });
         
@@ -149,17 +151,19 @@ exports.createProposal = async (req, res, next) => {
 
       if (!adminClientChatRoom) {
         // Create ChatRoom for Admin-Client communication
+        // adminStartedChat: false - ChatRoom hidden from client until admin starts chat
         adminClientChatRoom = await ChatRoom.create({
           project: projectId,
           projectRoom: projectRoom._id,
           type: "admin-client",
+          adminStartedChat: false, // Admin hasn't started chat yet
           participants: [
             {
               user: project.client,
               role: "client",
               joinedAt: new Date(),
             },
-            // Admin will be added when they join the chat
+            // Admin will be added when they start the chat
           ],
         });
         
@@ -367,6 +371,7 @@ exports.updateProposalStatus = async (req, res, next) => {
             project: projectId,
             projectRoom: projectRoom._id,
             type: "group",
+            adminObserver: true, // Admin is observer only, cannot send messages
             participants: [
               {
                 user: project.client,
@@ -381,12 +386,12 @@ exports.updateProposalStatus = async (req, res, next) => {
             ],
           });
 
-          // Send system message about acceptance
+          // Send system message about acceptance and admin observation
           const systemUserId = await getSystemUserId();
           const systemMessage = await Message.create({
             chatRoom: groupChatRoom._id,
             sender: systemUserId,
-            content: `تم قبول العرض وتم تعيين المهندس للمشروع "${project.title}". يمكنكم الآن التواصل مباشرة.`,
+            content: `تم قبول العرض وتم تعيين المهندس للمشروع "${project.title}". يمكنكم الآن التواصل مباشرة. ملاحظة: يتم رؤية محتوى هذه الدردشة من قبل الإدارة لضمان حقوق الطرفين.`,
             type: "system",
           });
           

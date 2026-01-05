@@ -79,6 +79,8 @@ const getProjectRooms = async (req, res) => {
       console.log(`✅ Project room query for ${userRole}:`, JSON.stringify(projectRoomQuery));
     }
     // Admins see all project rooms (no filter needed)
+    // BUT: Filter out cancelled projects for admins too (unless they want to see them)
+    // For now, we'll show cancelled projects to admins so they can see the history
 
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);

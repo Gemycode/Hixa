@@ -4,6 +4,7 @@ const ChatRoom = require("../models/chatRoomModel");
 const Message = require("../models/messageModel");
 const Proposal = require("../models/proposalModel");
 const ProjectNote = require("../models/projectNoteModel");
+const User = require("../models/userModel");
 const { uploadToCloudinary, uploadFileToCloudinary, deleteFromCloudinary } = require("../middleware/upload");
 const { getSystemUserId } = require("../utils/systemUser");
 const { createNotification } = require("./notificationController");
@@ -95,6 +96,31 @@ exports.createProject = async (req, res, next) => {
         status: "pending", // في انتظار المراجعة
       },
     });
+
+    // Notify all admins about new project
+    try {
+      const adminUsers = await User.find({ role: "admin", isActive: true }).select("_id");
+      if (adminUsers.length > 0) {
+        const clientName = req.user.name || 'مجهول';
+        const adminNotificationPromises = adminUsers.map(admin =>
+          createNotification({
+            user: admin._id,
+            type: "project_created",
+            title: "مشروع جديد",
+            message: `العميل ${clientName} أنشأ مشروع جديد "${project.title}" ويحتاج إلى مراجعة`,
+            data: {
+              projectId: project._id,
+            },
+            actionUrl: `/admin/projects/${project._id}`,
+          }).catch(err => console.error("❌ Error creating admin notification:", err))
+        );
+        await Promise.all(adminNotificationPromises);
+        console.log(`✅ Created ${adminUsers.length} notification(s) for admins about new project`);
+      }
+    } catch (notifError) {
+      console.error("❌ Error creating notifications:", notifError);
+      // Don't fail the project creation if notification fails
+    }
 
     res.status(201).json({
       message: "تم إنشاء المشروع بنجاح",
@@ -553,10 +579,12 @@ exports.updateProject = async (req, res, next) => {
 
         if (!groupChatRoom) {
           // Create Group ChatRoom
+          // adminObserver: true - Admin can see messages but not participate
           groupChatRoom = await ChatRoom.create({
             project: id,
             projectRoom: projectRoom._id,
             type: "group",
+            adminObserver: true, // Admin is observer only, cannot send messages
             participants: [
               {
                 user: project.client,
@@ -568,16 +596,16 @@ exports.updateProject = async (req, res, next) => {
                 role: "engineer",
                 joinedAt: new Date(),
               },
-              // Admin will be added when they join the chat
+              // Admin is observer, not a participant
             ],
           });
 
-          // Send system message about hiring
+          // Send system message about hiring and admin observation
           const systemUserId = await getSystemUserId();
           const systemMessage = await Message.create({
             chatRoom: groupChatRoom._id,
             sender: systemUserId,
-            content: `تم توظيف المهندس ${req.user.name || 'مجهول'} للمشروع "${project.title}". يمكنكم الآن التواصل مباشرة.`,
+            content: `تم توظيف المهندس ${req.user.name || 'مجهول'} للمشروع "${project.title}". يمكنكم الآن التواصل مباشرة. ملاحظة: يتم رؤية محتوى هذه الدردشة من قبل الإدارة لضمان حقوق الطرفين.`,
             type: "system",
           });
           

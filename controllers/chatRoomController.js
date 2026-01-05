@@ -3,12 +3,49 @@ const ProjectRoom = require("../models/projectRoomModel");
 const Project = require("../models/projectModel");
 const Message = require("../models/messageModel");
 const Proposal = require("../models/proposalModel");
+const User = require("../models/userModel");
 const mongoose = require("mongoose");
 const {
   addUnreadCountToChatRooms,
   addUnreadCountToChatRoom,
   updateLastReadAt,
 } = require("../utils/chatHelpers");
+
+// Import sanitizeProject helper
+const sanitizeProject = (project) => {
+  const projectObj = project.toObject ? project.toObject() : project;
+  return {
+    id: projectObj._id,
+    title: projectObj.title,
+    description: projectObj.description,
+    country: projectObj.country,
+    city: projectObj.city,
+    location: projectObj.location,
+    category: projectObj.category,
+    requirements: projectObj.requirements,
+    projectType: projectObj.projectType,
+    client: projectObj.client,
+    assignedEngineer: projectObj.assignedEngineer,
+    status: projectObj.status,
+    budget: projectObj.budget,
+    startDate: projectObj.startDate,
+    deadline: projectObj.deadline,
+    progress: projectObj.progress || 0,
+    statusHistory: projectObj.statusHistory || [],
+    attachments: projectObj.attachments || [],
+    proposalsCount: projectObj.proposalsCount || 0,
+    isActive: projectObj.isActive,
+    tags: projectObj.tags || [],
+    adminApproval: projectObj.adminApproval || {
+      status: "pending",
+      reviewedBy: null,
+      reviewedAt: null,
+      rejectionReason: null,
+    },
+    createdAt: projectObj.createdAt,
+    updatedAt: projectObj.updatedAt,
+  };
+};
 
 // Get all chat rooms within a project room
 const getChatRoomsByProjectRoom = async (req, res) => {
@@ -24,10 +61,20 @@ const getChatRoomsByProjectRoom = async (req, res) => {
       return res.status(404).json({ message: "غرفة المشروع غير موجودة" });
     }
 
+    // Get project to check status
+    const project = await Project.findById(projectRoom.project);
+    if (!project) {
+      return res.status(404).json({ message: "المشروع غير موجود" });
+    }
+
+    // Don't show chat rooms for deleted projects (isActive: false)
+    if (!project.isActive) {
+      return res.json({ data: [] });
+    }
+
     // Check permissions based on project room
     if (userRole === "client") {
-      const project = await Project.findById(projectRoom.project);
-      if (!project || project.client.toString() !== userId.toString()) {
+      if (project.client.toString() !== userId.toString()) {
         return res.status(403).json({ message: "غير مسموح لك بالوصول إلى هذه الغرفة" });
       }
     } else if (userRole === "engineer" || userRole === "company") {
@@ -50,15 +97,24 @@ const getChatRoomsByProjectRoom = async (req, res) => {
 
     // Filter chat rooms based on user role and permissions
     if (userRole === "client") {
-      // Clients see only chat rooms they are participants in
+      // Clients see only chat rooms they are participants in AND admin has started the chat
+      // OR group chats (which are always visible after assignment)
       chatRoomQuery = {
         projectRoom: roomId,
-        "participants.user": userId,
         status: "active",
+        $or: [
+          {
+            "participants.user": userId,
+            adminStartedChat: true, // Admin must have started the chat
+          },
+          {
+            type: "group", // Group chats are always visible after assignment
+          },
+        ],
       };
     } else if (userRole === "engineer" || userRole === "company") {
       // Engineers and companies see only chat rooms they are participants in OR where they are the engineer
-      // This handles both cases: when engineer/company is in participants array, or when engineer field matches
+      // BUT only if admin has started the chat (or it's a group chat)
       // Ensure userId is ObjectId for proper matching
       const userIdObjectId = mongoose.Types.ObjectId.isValid(userId) 
         ? (userId instanceof mongoose.Types.ObjectId ? userId : new mongoose.Types.ObjectId(userId))
@@ -67,15 +123,36 @@ const getChatRoomsByProjectRoom = async (req, res) => {
       console.log(`🔍 Building chat room query for ${userRole}, userId:`, userIdObjectId.toString());
       
       chatRoomQuery = {
+        projectRoom: roomId,
+        status: "active",
         $or: [
-          { projectRoom: roomId, "participants.user": userIdObjectId, status: "active" },
-          { projectRoom: roomId, engineer: userIdObjectId, status: "active" },
+          {
+            "participants.user": userIdObjectId,
+            adminStartedChat: true, // Admin must have started the chat
+          },
+          {
+            engineer: userIdObjectId,
+            adminStartedChat: true, // Admin must have started the chat
+          },
+          {
+            type: "group", // Group chats are always visible after assignment
+          },
         ],
       };
       
       console.log(`✅ Chat room query for ${userRole}:`, JSON.stringify(chatRoomQuery));
     }
     // Admins see all active chat rooms (no additional filter needed)
+    // BUT: Hide chat rooms for cancelled projects (except group chats that were created after assignment)
+    // Note: Deleted projects (isActive: false) are already filtered out above (return empty array)
+    if (project.status === "Cancelled") {
+      // For cancelled projects, only show group chats (if they exist)
+      // Don't show admin-engineer/admin-company/admin-client chats for cancelled projects
+      chatRoomQuery = {
+        ...chatRoomQuery,
+        type: "group", // Only group chats for cancelled projects
+      };
+    }
 
     const chatRooms = await ChatRoom.find(chatRoomQuery)
       .populate("participants.user", "name email role avatar")
@@ -83,8 +160,17 @@ const getChatRoomsByProjectRoom = async (req, res) => {
       .populate("lastMessage.sender", "name avatar")
       .sort({ createdAt: -1 });
 
-    console.log(`📋 Found ${chatRooms.length} chat rooms for ${userRole} in project room ${roomId}`);
-    chatRooms.forEach((room, index) => {
+    // Additional filter: Remove chat rooms for cancelled projects (except group chats)
+    // This is a safety check in case the query didn't filter them out
+    const filteredChatRooms = chatRooms.filter(room => {
+      if (project.status === "Cancelled" && room.type !== "group") {
+        return false; // Hide non-group chats for cancelled projects
+      }
+      return true;
+    });
+
+    console.log(`📋 Found ${filteredChatRooms.length} chat rooms for ${userRole} in project room ${roomId} (after filtering)`);
+    filteredChatRooms.forEach((room, index) => {
       console.log(`📋 Chat room ${index + 1}:`, {
         id: room._id.toString(),
         type: room.type,
@@ -97,7 +183,7 @@ const getChatRoomsByProjectRoom = async (req, res) => {
     });
 
     // Add unread count to each chat room
-    const chatRoomsWithUnread = await addUnreadCountToChatRooms(chatRooms, userId);
+    const chatRoomsWithUnread = await addUnreadCountToChatRooms(filteredChatRooms, userId);
 
     res.json({ data: chatRoomsWithUnread });
   } catch (error) {
@@ -189,13 +275,33 @@ const getMyChatRooms = async (req, res) => {
       console.log(`🔍 Building getMyChatRooms query for ${userRole}, userId:`, userIdObjectId.toString());
       
       chatRoomQuery = {
+        status: "active",
         $or: [
-          { "participants.user": userIdObjectId, status: "active" },
-          { engineer: userIdObjectId, status: "active" },
+          {
+            "participants.user": userIdObjectId,
+            adminStartedChat: true, // Admin must have started the chat
+          },
+          {
+            engineer: userIdObjectId,
+            adminStartedChat: true, // Admin must have started the chat
+          },
+          {
+            type: "group", // Group chats are always visible after assignment
+          },
         ],
       };
       
       console.log(`✅ getMyChatRooms query for ${userRole}:`, JSON.stringify(chatRoomQuery));
+    } else if (userRole === "client") {
+      // Clients see only chat rooms where admin has started the chat OR group chats
+      chatRoomQuery = {
+        status: "active",
+        "participants.user": userId,
+        $or: [
+          { adminStartedChat: true }, // Admin must have started the chat
+          { type: "group" }, // Group chats are always visible after assignment
+        ],
+      };
     }
 
     // Filter by type
@@ -314,6 +420,319 @@ const createChatRoom = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({ message: "غرفة الدردشة موجودة بالفعل" });
     }
+    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
+  }
+};
+
+// Start chat - Admin initiates conversation (makes chat visible to engineer/client)
+const startChat = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const userId = req.user._id;
+    const userRole = req.user.role;
+
+    // Only admin can start chats
+    if (userRole !== "admin") {
+      return res.status(403).json({ message: "غير مصرح لك بهذه العملية" });
+    }
+
+    const chatRoom = await ChatRoom.findById(roomId);
+    if (!chatRoom) {
+      return res.status(404).json({ message: "غرفة الدردشة غير موجودة" });
+    }
+
+    // Check if project is cancelled or deleted - don't allow starting chat for cancelled/deleted projects
+    const project = await Project.findById(chatRoom.project);
+    if (!project) {
+      return res.status(404).json({ message: "المشروع غير موجود" });
+    }
+    
+    if (!project.isActive) {
+      return res.status(400).json({ 
+        message: "لا يمكن بدء الدردشة لمشروع محذوف" 
+      });
+    }
+    
+    if (project.status === "Cancelled") {
+      return res.status(400).json({ 
+        message: "لا يمكن بدء الدردشة لمشروع ملغي. تم إلغاء المشروع من قبل العميل" 
+      });
+    }
+
+    // Check if chat is already started
+    if (chatRoom.adminStartedChat) {
+      return res.status(400).json({ message: "تم بدء الدردشة بالفعل" });
+    }
+
+    // Mark chat as started
+    chatRoom.adminStartedChat = true;
+
+    // Add admin to participants if not already present
+    const adminExists = chatRoom.participants.some(
+      p => p.user.toString() === userId.toString() && p.role === "admin"
+    );
+    
+    if (!adminExists) {
+      chatRoom.participants.push({
+        user: userId,
+        role: "admin",
+        joinedAt: new Date(),
+      });
+    }
+
+    await chatRoom.save();
+
+    // Send system message
+    const Message = require("../models/messageModel");
+    const { getSystemUserId } = require("../utils/systemUser");
+    const systemUserId = await getSystemUserId();
+    
+    const systemMessage = await Message.create({
+      chatRoom: chatRoom._id,
+      sender: systemUserId,
+      content: "بدأ الأدمن الدردشة. يمكنك الآن التواصل.",
+      type: "system",
+    });
+
+    // Update chat room's last message
+    chatRoom.lastMessage = {
+      content: systemMessage.content.substring(0, 100),
+      sender: systemUserId,
+      createdAt: systemMessage.createdAt,
+    };
+    await chatRoom.save();
+
+    // Send notification to the other participant (engineer/client)
+    const { createNotification } = require("./notificationController");
+    const otherParticipant = chatRoom.participants.find(
+      p => p.user.toString() !== userId.toString()
+    );
+    
+    if (otherParticipant) {
+      const chatRoomType = chatRoom.type;
+      let notificationMessage = "";
+      if (chatRoomType === "admin-engineer" || chatRoomType === "admin-company") {
+        notificationMessage = "بدأ الأدمن الدردشة معك. يمكنك الآن التواصل.";
+      } else if (chatRoomType === "admin-client") {
+        notificationMessage = "بدأ الأدمن الدردشة معك. يمكنك الآن التواصل.";
+      }
+
+      if (notificationMessage) {
+        await createNotification({
+          user: otherParticipant.user,
+          type: "chat_started",
+          title: "بدء الدردشة",
+          message: notificationMessage,
+          data: {
+            chatRoomId: chatRoom._id,
+            projectId: chatRoom.project,
+          },
+          actionUrl: `/messages?chatRoom=${chatRoom._id}`,
+        }).catch(err => console.error("❌ Error creating notification:", err));
+      }
+    }
+
+    // Emit socket event
+    const { getIO } = require('../socket');
+    const io = getIO();
+    if (io) {
+      io.to(chatRoom._id.toString()).emit('chat_started', {
+        chatRoomId: chatRoom._id,
+        adminStartedChat: true,
+      });
+    }
+
+    res.json({
+      message: "تم بدء الدردشة بنجاح",
+      data: chatRoom,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
+  }
+};
+
+// Assign engineer from chat room - Admin assigns engineer directly from chat
+const assignEngineerFromChat = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const { engineerId } = req.body;
+    const userId = req.user._id;
+    const userRole = req.user.role;
+
+    // Only admin can assign engineers
+    if (userRole !== "admin") {
+      return res.status(403).json({ message: "غير مصرح لك بهذه العملية" });
+    }
+
+    const chatRoom = await ChatRoom.findById(roomId);
+    if (!chatRoom) {
+      return res.status(404).json({ message: "غرفة الدردشة غير موجودة" });
+    }
+
+    // Only allow assignment from admin-engineer or admin-company chat rooms
+    if (chatRoom.type !== "admin-engineer" && chatRoom.type !== "admin-company") {
+      return res.status(400).json({ message: "يمكن تعيين المهندس من شات الأدمن مع المهندس فقط" });
+    }
+
+    // Get engineer ID from chat room if not provided
+    const targetEngineerId = engineerId || chatRoom.engineer;
+    if (!targetEngineerId) {
+      return res.status(400).json({ message: "لم يتم العثور على معرف المهندس" });
+    }
+
+    // Get project
+    const project = await Project.findById(chatRoom.project);
+    if (!project) {
+      return res.status(404).json({ message: "المشروع غير موجود" });
+    }
+
+    // Check if project is deleted - don't allow assigning engineer to deleted projects
+    if (!project.isActive) {
+      return res.status(400).json({ 
+        message: "لا يمكن تعيين مهندس لمشروع محذوف" 
+      });
+    }
+
+    // Check if project is cancelled - don't allow assigning engineer to cancelled projects
+    if (project.status === "Cancelled") {
+      return res.status(400).json({ 
+        message: "لا يمكن تعيين مهندس لمشروع ملغي. تم إلغاء المشروع من قبل العميل" 
+      });
+    }
+
+    // Get engineer user
+    const engineer = await User.findById(targetEngineerId);
+    if (!engineer || (engineer.role !== "engineer" && engineer.role !== "company")) {
+      return res.status(404).json({ message: "المهندس غير موجود" });
+    }
+
+    // Assign engineer to project
+    project.assignedEngineer = targetEngineerId;
+    project.status = "In Progress";
+    await project.save();
+
+    // Reject all other proposals for this project
+    await Proposal.updateMany(
+      {
+        project: project._id,
+        engineer: { $ne: targetEngineerId },
+        status: { $ne: "rejected" }
+      },
+      { status: "rejected" }
+    );
+
+    // Get or create ProjectRoom
+    let projectRoom = await ProjectRoom.findOne({ project: project._id });
+    if (!projectRoom) {
+      projectRoom = await ProjectRoom.create({
+        project: project._id,
+        projectTitle: project.title,
+      });
+    }
+
+    // Create or update group chat room
+    let groupChatRoom = await ChatRoom.findOne({
+      project: project._id,
+      projectRoom: projectRoom._id,
+      type: "group",
+    });
+
+    if (!groupChatRoom) {
+      // Create Group ChatRoom with adminObserver
+      groupChatRoom = await ChatRoom.create({
+        project: project._id,
+        projectRoom: projectRoom._id,
+        type: "group",
+        adminObserver: true, // Admin is observer only
+        participants: [
+          {
+            user: project.client,
+            role: "client",
+            joinedAt: new Date(),
+          },
+          {
+            user: targetEngineerId,
+            role: engineer.role, // "engineer" or "company"
+            joinedAt: new Date(),
+          },
+        ],
+      });
+    } else {
+      // Add engineer if not already in participants
+      const engineerExists = groupChatRoom.participants.some(
+        p => p.user.toString() === targetEngineerId.toString()
+      );
+      if (!engineerExists) {
+        groupChatRoom.participants.push({
+          user: targetEngineerId,
+          role: engineer.role,
+          joinedAt: new Date(),
+        });
+        groupChatRoom.adminObserver = true; // Ensure admin observer mode
+        await groupChatRoom.save();
+      }
+    }
+
+    // Send system message about assignment and admin observation
+    const { getSystemUserId } = require("../utils/systemUser");
+    const systemUserId = await getSystemUserId();
+    const systemMessage = await Message.create({
+      chatRoom: groupChatRoom._id,
+      sender: systemUserId,
+      content: `تم تعيين ${engineer.role === "company" ? "الشركة" : "المهندس"} ${engineer.name || 'مجهول'} للمشروع "${project.title}". يمكنكم الآن التواصل مباشرة. ملاحظة: يتم رؤية محتوى هذه الدردشة من قبل الإدارة لضمان حقوق الطرفين.`,
+      type: "system",
+    });
+
+    // Update chat room's last message
+    groupChatRoom.lastMessage = {
+      content: systemMessage.content.substring(0, 100),
+      sender: systemUserId,
+      createdAt: systemMessage.createdAt,
+    };
+    await groupChatRoom.save();
+
+    // Update project room's last activity
+    projectRoom.lastActivityAt = systemMessage.createdAt;
+    await projectRoom.save();
+
+    // Send notifications
+    const { createNotification } = require("./notificationController");
+    
+    // Notify client
+    await createNotification({
+      user: project.client,
+      type: "engineer_assigned",
+      title: "تم تعيين المهندس",
+      message: `تم تعيين ${engineer.role === "company" ? "الشركة" : "المهندس"} ${engineer.name || 'مجهول'} لمشروعك "${project.title}"`,
+      data: {
+        projectId: project._id,
+        engineerId: targetEngineerId,
+        chatRoomId: groupChatRoom._id,
+      },
+      actionUrl: `/messages?chatRoom=${groupChatRoom._id}`,
+    }).catch(err => console.error("❌ Error creating client notification:", err));
+
+    // Notify engineer
+    await createNotification({
+      user: targetEngineerId,
+      type: "project_assigned",
+      title: "تم تعيينك للمشروع",
+      message: `تم تعيينك لمشروع "${project.title}". يمكنك الآن التواصل مع العميل.`,
+      data: {
+        projectId: project._id,
+        chatRoomId: groupChatRoom._id,
+      },
+      actionUrl: `/messages?chatRoom=${groupChatRoom._id}`,
+    }).catch(err => console.error("❌ Error creating engineer notification:", err));
+
+    res.json({
+      message: "تم تعيين المهندس بنجاح",
+      data: {
+        project: sanitizeProject(project),
+        groupChatRoom: groupChatRoom,
+      },
+    });
+  } catch (error) {
     res.status(500).json({ message: "خطأ في الخادم", error: error.message });
   }
 };
@@ -602,6 +1021,8 @@ module.exports = {
   getChatRoomById,
   getMyChatRooms,
   createChatRoom,
+  startChat,
+  assignEngineerFromChat,
   archiveChatRoom,
   unarchiveChatRoom,
   deleteChatRoom,

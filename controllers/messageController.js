@@ -70,6 +70,11 @@ const sendMessage = async (req, res, next) => {
       console.log('✅ Engineer/company added to participants');
     }
 
+    // Check if admin is trying to send message in observer mode
+    if (req.user.role === 'admin' && chatRoom.adminObserver === true && chatRoom.type === 'group') {
+      throw new ForbiddenError('الأدمن في وضع المراقبة فقط ولا يمكنه إرسال رسائل في هذه الغرفة');
+    }
+
     if (!isParticipant && !isEngineerOrCompany && req.user.role !== 'admin') {
       throw new ForbiddenError('غير مصرح لك بإرسال رسائل في هذه الغرفة');
     }

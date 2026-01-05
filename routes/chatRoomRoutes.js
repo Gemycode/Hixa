@@ -6,6 +6,8 @@ const {
   getChatRoomById,
   getMyChatRooms,
   createChatRoom,
+  startChat,
+  assignEngineerFromChat,
   archiveChatRoom,
   unarchiveChatRoom,
   deleteChatRoom,
@@ -30,6 +32,8 @@ router.post("/", restrictTo("admin"), validateChatRoomCreate, createChatRoom);
 // Specific routes with :roomId must come before generic :roomId route
 router.put("/:roomId/read", markChatRoomAsRead);
 router.get("/:roomId/unread-count", getChatRoomUnreadCount);
+router.post("/:roomId/start-chat", restrictTo("admin"), startChat); // Admin starts chat
+router.post("/:roomId/assign-engineer", restrictTo("admin"), assignEngineerFromChat); // Admin assigns engineer from chat
 router.patch("/:roomId/archive", restrictTo("admin"), archiveChatRoom);
 router.patch("/:roomId/unarchive", restrictTo("admin"), unarchiveChatRoom);
 router.post("/:roomId/participants", restrictTo("admin"), validateAddParticipant, addParticipant);

@@ -1,6 +1,8 @@
 const Content = require("../models/contentModel");
 const { uploadToCloudinary, deleteFromCloudinary } = require("../middleware/upload");
 const mongoose = require("mongoose");
+const QRCode = require("qrcode");
+const QRCode = require("qrcode");
 
 // Helper function to update content section
 const updateSection = async (sectionName, updateData, res) => {
@@ -1244,3 +1246,6 @@ exports.uploadImage = async (req, res) => {
   }
 };
 
+
+ 
+ 

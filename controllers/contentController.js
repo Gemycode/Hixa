@@ -2,7 +2,6 @@ const Content = require("../models/contentModel");
 const { uploadToCloudinary, deleteFromCloudinary } = require("../middleware/upload");
 const mongoose = require("mongoose");
 const QRCode = require("qrcode");
-const QRCode = require("qrcode");
 
 // Helper function to update content section
 const updateSection = async (sectionName, updateData, res) => {
@@ -969,6 +968,32 @@ exports.uploadImage = async (req, res) => {
     res.status(500).json({ message: "خطأ في رفع الصورة", error: err.message });
   }
 };
+
+// Generate QR Code for a service detail
+exports.generateServiceQRCode = async (req, res) => {
+  try {
+    const { serviceId, detailId } = req.params;
+    
+    if (!serviceId || !detailId) {
+      return res.status(400).json({ message: "معرف الخدمة أو التفصيل غير صالح" });
+    }
+
+    // Generate QR code as data URL
+    const qrCodeData = await QRCode.toDataURL(`service:${serviceId}:${detailId}`);
+    
+    // Return the QR code image as base64
+    const img = Buffer.from(qrCodeData.split(',')[1], 'base64');
+    
+    res.writeHead(200, {
+      'Content-Type': 'image/png',
+      'Content-Length': img.length
+    });
+    res.end(img);
+  } catch (error) {
+    console.error('Error generating QR code:', error);
+    res.status(500).json({ message: "خطأ في إنشاء رمز الاستجابة السريعة", error: error.message });
+  }
+};
 // DELETE partner item by ID
 exports.deletePartnerItem = async (req, res) => {
   try {
@@ -1246,6 +1271,28 @@ exports.uploadImage = async (req, res) => {
   }
 };
 
+// Generate QR Code for a service detail
+exports.generateServiceQRCode = async (req, res) => {
+  try {
+    const { serviceId, detailId } = req.params;
+    
+    if (!serviceId || !detailId) {
+      return res.status(400).json({ message: "معرف الخدمة أو التفصيل غير صالح" });
+    }
 
- 
- 
+    // Generate QR code as data URL
+    const qrCodeData = await QRCode.toDataURL(`service:${serviceId}:${detailId}`);
+    
+    // Return the QR code image as base64
+    const img = Buffer.from(qrCodeData.split(',')[1], 'base64');
+    
+    res.writeHead(200, {
+      'Content-Type': 'image/png',
+      'Content-Length': img.length
+    });
+    res.end(img);
+  } catch (error) {
+    console.error('Error generating QR code:', error);
+    res.status(500).json({ message: "خطأ في إنشاء رمز الاستجابة السريعة", error: error.message });
+  }
+};

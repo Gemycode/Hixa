@@ -18,7 +18,6 @@ const {
   updateCTA,
   updateFooter,
   uploadImage,
-  generateServiceQRCode,
 } = require("../controllers/contentController");
 
 const { protect, restrictTo } = require("../middleware/auth");
@@ -50,7 +49,7 @@ router.get("/services/:itemId", getService);
 router.put("/services/:itemId", protect, restrictTo("admin"), validateService, updateService);
 router.put("/services/:itemId/details/:detailId", protect, restrictTo("admin"), validateServiceDetail, updateServiceDetail);
 router.post("/services/:itemId/details/:detailId/image", protect, restrictTo("admin"), uploadSingle("image"), uploadServiceDetailImage);
-router.get("/services/:serviceId/details/:detailId/qrcode", generateServiceQRCode); // Public endpoint for QR Code
+// router.get("/services/:serviceId/details/:detailId/qrcode", generateServiceQRCode); // Public endpoint for QR Code
 
 // Projects
 router.put("/projects", protect, restrictTo("admin"), (req, res, next) => {

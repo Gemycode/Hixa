@@ -32,6 +32,10 @@ const ContentSchema = new mongoose.Schema(
         icon: { type: String, default: "" },
         details: {
           detail1: {
+            qrCodeImage: {
+              type: String,
+              default: ""
+            },
             title_en: { type: String, default: "" },
             title_ar: { type: String, default: "" },
             details_en: { type: String, default: "" },
@@ -39,6 +43,10 @@ const ContentSchema = new mongoose.Schema(
             image: { type: String, default: "" },
           },
           detail2: {
+            qrCodeImage: {
+              type: String,
+              default: ""
+            },
             title_en: { type: String, default: "" },
             title_ar: { type: String, default: "" },
             details_en: { type: String, default: "" },
@@ -46,6 +54,10 @@ const ContentSchema = new mongoose.Schema(
             image: { type: String, default: "" },
           },
           detail3: {
+            qrCodeImage: {
+              type: String,
+              default: ""
+            },
             title_en: { type: String, default: "" },
             title_ar: { type: String, default: "" },
             details_en: { type: String, default: "" },
@@ -53,6 +65,10 @@ const ContentSchema = new mongoose.Schema(
             image: { type: String, default: "" },
           },
           detail4: {
+            qrCodeImage: {
+              type: String,
+              default: ""
+            },
             title_en: { type: String, default: "" },
             title_ar: { type: String, default: "" },
             details_en: { type: String, default: "" },

@@ -339,6 +339,41 @@ exports.uploadServiceDetailImage = async (req, res) => {
     res.status(500).json({ message: "خطأ في الخادم", error: err.message });
   }
 };
+exports.uploadQRCode = async (req, res, next) => {
+  try {
+    const content = await Content.findOne();
+    if (!content) {
+      return res.status(404).json({ message: 'No content found' });
+    }
+
+    const service = content.services.id(req.params.itemId);
+    if (!service) {
+      return res.status(404).json({ message: 'Service not found' });
+    }
+
+    const detail = service.details.id(req.params.detailId);
+    if (!detail) {
+      return res.status(404).json({ message: 'Service detail not found' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'No QR code file uploaded' });
+    }
+
+    // تحديث مسار صورة QR
+    detail.qrCodeImage = `/uploads/${req.file.filename}`;
+    await content.save();
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        qrCodeUrl: detail.qrCodeImage
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // ADD new project item
 exports.addProjectItem = async (req, res) => {
@@ -1272,27 +1307,27 @@ exports.uploadImage = async (req, res) => {
 };
 
 // Generate QR Code for a service detail
-exports.generateServiceQRCode = async (req, res) => {
-  try {
-    const { serviceId, detailId } = req.params;
+// exports.generateServiceQRCode = async (req, res) => {
+//   try {
+//     const { serviceId, detailId } = req.params;
     
-    if (!serviceId || !detailId) {
-      return res.status(400).json({ message: "معرف الخدمة أو التفصيل غير صالح" });
-    }
+//     if (!serviceId || !detailId) {
+//       return res.status(400).json({ message: "معرف الخدمة أو التفصيل غير صالح" });
+//     }
 
-    // Generate QR code as data URL
-    const qrCodeData = await QRCode.toDataURL(`service:${serviceId}:${detailId}`);
+//     // Generate QR code as data URL
+//     const qrCodeData = await QRCode.toDataURL(`service:${serviceId}:${detailId}`);
     
-    // Return the QR code image as base64
-    const img = Buffer.from(qrCodeData.split(',')[1], 'base64');
+//     // Return the QR code image as base64
+//     const img = Buffer.from(qrCodeData.split(',')[1], 'base64');
     
-    res.writeHead(200, {
-      'Content-Type': 'image/png',
-      'Content-Length': img.length
-    });
-    res.end(img);
-  } catch (error) {
-    console.error('Error generating QR code:', error);
-    res.status(500).json({ message: "خطأ في إنشاء رمز الاستجابة السريعة", error: error.message });
-  }
-};
+//     res.writeHead(200, {
+//       'Content-Type': 'image/png',
+//       'Content-Length': img.length
+//     });
+//     res.end(img);
+//   } catch (error) {
+//     console.error('Error generating QR code:', error);
+//     res.status(500).json({ message: "خطأ في إنشاء رمز الاستجابة السريعة", error: error.message });
+//   }
+// };

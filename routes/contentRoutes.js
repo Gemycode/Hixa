@@ -10,6 +10,7 @@ const {
   updateService,
   updateServiceDetail,
   uploadServiceDetailImage,
+  uploadQRCode,
   updateProjects,
   addProjectItem,
   updateProjectItem,
@@ -49,6 +50,14 @@ router.get("/services/:itemId", getService);
 router.put("/services/:itemId", protect, restrictTo("admin"), validateService, updateService);
 router.put("/services/:itemId/details/:detailId", protect, restrictTo("admin"), validateServiceDetail, updateServiceDetail);
 router.post("/services/:itemId/details/:detailId/image", protect, restrictTo("admin"), uploadSingle("image"), uploadServiceDetailImage);
+// بعد سطر رفع صورة التفاصيل
+router.post(
+  "/services/:itemId/details/:detailId/qrcode", 
+  protect, 
+  restrictTo("admin"), 
+  uploadSingle("qrCode"), 
+  uploadQRCode
+);
 // router.get("/services/:serviceId/details/:detailId/qrcode", generateServiceQRCode); // Public endpoint for QR Code
 
 // Projects

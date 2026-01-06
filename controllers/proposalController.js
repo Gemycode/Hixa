@@ -257,23 +257,7 @@ exports.createProposal = async (req, res, next) => {
         });
         
         console.log(`✅ Created Admin-Client ChatRoom for project ${projectId}`, adminClientChatRoom._id);
-        
-        // Send system message in Admin-Client ChatRoom
-        const systemUserId = await getSystemUserId();
-        const systemMessageClient = await Message.create({
-          chatRoom: adminClientChatRoom._id,
-          sender: systemUserId,
-          content: `قام المهندس ${req.user.name || 'مجهول'} بتقديم عرض على مشروعك "${project.title}". سيتم التواصل معك قريباً.`,
-          type: "system",
-        });
-        
-        // Update chat room's last message
-        adminClientChatRoom.lastMessage = {
-          content: systemMessageClient.content.substring(0, 100),
-          sender: systemUserId,
-          createdAt: systemMessageClient.createdAt,
-        };
-        await adminClientChatRoom.save();
+        // Note: No notification to client at this stage - they will be notified when engineer is assigned
       }
 
       // Send system message in Admin-Engineer/Company ChatRoom
@@ -309,12 +293,13 @@ exports.createProposal = async (req, res, next) => {
               user: admin._id,
               type: "proposal_submitted",
               title: "عرض جديد",
-              message: `${userType} ${req.user.name || 'مجهول'} قدم عرضاً على المشروع "${project.title}"`,
+              message: `${userType} ${req.user.name || 'مجهول'} قدم عرضاً على المشروع "${project.title}". ابدأ الدردشة معه الآن.`,
               data: {
                 projectId: project._id,
                 proposalId: proposal._id,
+                projectRoomId: projectRoom._id,
               },
-              actionUrl: `/projects/${project._id}/proposals`,
+              actionUrl: `/admin/messages?projectRoom=${projectRoom._id}`,
             }).catch(err => console.error("❌ Error creating admin notification:", err))
           );
           await Promise.all(adminNotificationPromises);

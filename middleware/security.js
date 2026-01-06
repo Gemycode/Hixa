@@ -22,17 +22,39 @@ const corsOptions = {
 };
 
 // Rate limiting for API routes
-// In development: 1000 requests per 15 minutes (more lenient for testing)
+// In development: 10000 requests per 15 minutes (very lenient for testing)
 // In production: 100 requests per 15 minutes
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'development' ? 1000 : 100, // More lenient in development
+  max: process.env.NODE_ENV === 'development' ? 10000 : 100, // Very lenient in development
   message: 'تم تجاوز الحد المسموح من الطلبات. يرجى المحاولة بعد 15 دقيقة',
   handler: (req, res, next, options) => {
     throw new RateLimitExceededError(options.message);
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  // Skip rate limiting for certain conditions
+  skip: (req) => {
+    // Skip for OPTIONS requests (CORS preflight)
+    if (req.method === 'OPTIONS') {
+      return true;
+    }
+    // Skip for health check endpoints
+    if (req.path === '/' || req.path === '/health') {
+      return true;
+    }
+    return false;
+  },
+  // Better IP detection
+  keyGenerator: (req) => {
+    // Try to get real IP from various headers (for proxies/load balancers)
+    return req.ip || 
+           req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 
+           req.headers['x-real-ip'] || 
+           req.connection.remoteAddress || 
+           req.socket.remoteAddress ||
+           'unknown';
+  },
 });
 
 // Rate limiting for authentication routes (5 requests per minute)

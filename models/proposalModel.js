@@ -30,9 +30,23 @@ const ProposalSchema = new mongoose.Schema(
       maxlength: 3000,
     },
     proposedBudget: {
-      amount: { type: Number, min: 0 },
+      amount: { type: Number, min: 0 }, // الإجمالي (يُحسب تلقائياً من البنود)
       currency: { type: String, trim: true, maxlength: 10, default: "SAR" },
+      items: [ // بنود الميزانية
+        {
+          description: { type: String, trim: true, maxlength: 500, required: true },
+          amount: { type: Number, min: 0, required: true },
+        }
+      ],
     },
+    attachments: [ // الملفات المرفقة
+      {
+        name: { type: String, trim: true, maxlength: 500 },
+        url: { type: String, required: true },
+        type: { type: String, trim: true, maxlength: 100 }, // PDF, DOCX, JPG, etc.
+        size: { type: Number }, // حجم الملف بالبايت
+      }
+    ],
     status: {
       type: String,
       enum: ["pending", "reviewed", "accepted", "rejected"],

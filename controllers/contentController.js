@@ -233,7 +233,7 @@ exports.updateService = async (req, res) => {
 exports.updateServiceDetail = async (req, res) => {
   try {
     const { itemId, detailId } = req.params;
-    const { title_en, title_ar, details_en, details_ar, image } = req.body;
+    const { title_en, title_ar, details_en, details_ar, image, qrCodeImage } = req.body;
 
     // Validate itemId
     const validItemIds = ["item1", "item2", "item3", "item4"];
@@ -258,6 +258,7 @@ exports.updateServiceDetail = async (req, res) => {
     if (details_en !== undefined) updateFields[`services.${itemId}.details.${detailId}.details_en`] = details_en;
     if (details_ar !== undefined) updateFields[`services.${itemId}.details.${detailId}.details_ar`] = details_ar;
     if (image !== undefined) updateFields[`services.${itemId}.details.${detailId}.image`] = image;
+    if (qrCodeImage !== undefined) updateFields[`services.${itemId}.details.${detailId}.qrCodeImage`] = qrCodeImage;
 
     // Check if there are any fields to update
     if (Object.keys(updateFields).length === 0) {
@@ -339,39 +340,63 @@ exports.uploadServiceDetailImage = async (req, res) => {
     res.status(500).json({ message: "خطأ في الخادم", error: err.message });
   }
 };
-exports.uploadQRCode = async (req, res, next) => {
+exports.uploadQRCode = async (req, res) => {
   try {
-    const content = await Content.findOne();
-    if (!content) {
-      return res.status(404).json({ message: 'No content found' });
+    const { itemId, detailId } = req.params;
+
+    // Validate itemId
+    const validItemIds = ["item1", "item2", "item3", "item4"];
+    if (!validItemIds.includes(itemId)) {
+      return res.status(400).json({ 
+        message: "معرف الخدمة غير صحيح. يجب أن يكون item1, item2, item3, أو item4" 
+      });
     }
 
-    const service = content.services.id(req.params.itemId);
-    if (!service) {
-      return res.status(404).json({ message: 'Service not found' });
-    }
-
-    const detail = service.details.id(req.params.detailId);
-    if (!detail) {
-      return res.status(404).json({ message: 'Service detail not found' });
+    // Validate detailId
+    const validDetailIds = ["detail1", "detail2", "detail3", "detail4"];
+    if (!validDetailIds.includes(detailId)) {
+      return res.status(400).json({ 
+        message: "معرف التفصيل غير صحيح. يجب أن يكون detail1, detail2, detail3, أو detail4" 
+      });
     }
 
     if (!req.file) {
-      return res.status(400).json({ message: 'No QR code file uploaded' });
+      return res.status(400).json({ message: "لم يتم رفع أي ملف" });
     }
 
-    // تحديث مسار صورة QR
-    detail.qrCodeImage = `/uploads/${req.file.filename}`;
-    await content.save();
-
-    res.status(200).json({
-      status: 'success',
-      data: {
-        qrCodeUrl: detail.qrCodeImage
+    // Get current content to check if QR code image exists
+    const content = await Content.findOne();
+    if (content && content.services && content.services[itemId] && 
+        content.services[itemId].details && content.services[itemId].details[detailId] &&
+        content.services[itemId].details[detailId].qrCodeImage && 
+        content.services[itemId].details[detailId].qrCodeImage.includes("cloudinary.com")) {
+      // Delete old QR code image from Cloudinary
+      try {
+        await deleteFromCloudinary(content.services[itemId].details[detailId].qrCodeImage);
+      } catch (err) {
+        console.error("Error deleting old QR code image from Cloudinary:", err);
       }
+    }
+
+    // Upload new QR code image to Cloudinary
+    const qrCodeImageUrl = await uploadToCloudinary(req.file.buffer, "hixa/services/qrcodes");
+
+    // Update the QR code image URL in database
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $set: { [`services.${itemId}.details.${detailId}.qrCodeImage`]: qrCodeImageUrl } },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    res.json({
+      message: "تم رفع صورة QR بنجاح",
+      data: {
+        qrCodeImage: qrCodeImageUrl,
+        detail: updated.services[itemId].details[detailId],
+      },
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
   }
 };
 

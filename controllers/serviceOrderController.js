@@ -6,6 +6,7 @@ const sanitizeServiceOrder = (order) => {
     id: o._id,
     orderDetails: o.orderDetails,
     email: o.email,
+    phone: o.phone,
     status: o.status,
     isActive: o.isActive,
     createdAt: o.createdAt,
@@ -16,10 +17,11 @@ const sanitizeServiceOrder = (order) => {
 // Public: create a service order (landing modal form) - minimal fields
 exports.createServiceOrder = async (req, res, next) => {
   try {
-    const { email, orderDetails } = req.body;
+    const { email, phone, orderDetails } = req.body;
 
     const order = await ServiceOrder.create({
       email,
+      phone,
       orderDetails,
     });
 
@@ -45,7 +47,7 @@ exports.getServiceOrders = async (req, res, next) => {
     if (email) filters.email = new RegExp(email, "i");
     if (search) {
       const regex = new RegExp(search, "i");
-      filters.$or = [{ orderDetails: regex }, { email: regex }];
+      filters.$or = [{ orderDetails: regex }, { email: regex }, { phone: regex }];
     }
 
     const [orders, total] = await Promise.all([
@@ -84,7 +86,7 @@ exports.getServiceOrderById = async (req, res, next) => {
 exports.updateServiceOrder = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { orderDetails, email, status } = req.body;
+    const { orderDetails, email, phone, status } = req.body;
     const order = await ServiceOrder.findById(id);
 
     if (!order || !order.isActive) {
@@ -93,6 +95,7 @@ exports.updateServiceOrder = async (req, res, next) => {
 
     if (orderDetails !== undefined) order.orderDetails = orderDetails;
     if (email !== undefined) order.email = email;
+    if (phone !== undefined) order.phone = phone;
     if (status !== undefined) order.status = status;
 
     await order.save();

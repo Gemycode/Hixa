@@ -6,6 +6,7 @@ const Message = require("../models/messageModel");
 const User = require("../models/userModel");
 const { getSystemUserId } = require("../utils/systemUser");
 const { createNotification } = require("./notificationController");
+const { uploadFileToCloudinary } = require("../middleware/upload");
 
 // Format proposal for responses
 const sanitizeProposal = (proposal, userRole = null) => {
@@ -28,12 +29,15 @@ const sanitizeProposal = (proposal, userRole = null) => {
   
   return {
     id: obj._id,
+    _id: obj._id, // Also include _id for compatibility
     project: project,
     engineer: obj.engineer,
     description: obj.description,
     estimatedTimeline: obj.estimatedTimeline,
     relevantExperience: obj.relevantExperience,
     proposedBudget: obj.proposedBudget,
+    milestones: obj.milestones || [],
+    attachments: obj.attachments || [],
     status: obj.status,
     createdAt: obj.createdAt,
     updatedAt: obj.updatedAt,
@@ -43,7 +47,12 @@ const sanitizeProposal = (proposal, userRole = null) => {
 // Engineer or Company submits proposal on a project
 exports.createProposal = async (req, res, next) => {
   try {
-    const { projectId, description, estimatedTimeline, relevantExperience, proposedBudget } = req.body;
+    let { projectId, description, estimatedTimeline, relevantExperience, proposedBudget, milestones } = req.body;
+    
+    // Normalize relevantExperience - convert empty string to undefined
+    if (relevantExperience === '' || relevantExperience === null) {
+      relevantExperience = undefined;
+    }
 
     if (req.user.role !== "engineer" && req.user.role !== "company") {
       return res.status(403).json({ message: "هذه العملية للمهندسين والشركات فقط" });
@@ -80,13 +89,93 @@ exports.createProposal = async (req, res, next) => {
       return res.status(400).json({ message: "لقد قدمت عرضاً لهذا المشروع بالفعل" });
     }
 
+    // Parse proposedBudget if it's a string (from FormData)
+    if (typeof proposedBudget === "string") {
+      try {
+        proposedBudget = JSON.parse(proposedBudget);
+      } catch (e) {
+        proposedBudget = { amount: proposedBudget, currency: "SAR", items: [] };
+      }
+    }
+
+    // Parse milestones if provided (legacy support) and convert to budget items
+    let budgetItems = [];
+    if (milestones) {
+      try {
+        if (typeof milestones === "string") {
+          milestones = JSON.parse(milestones);
+        }
+        // Convert milestones to budget items
+        budgetItems = milestones
+          .filter(m => m.label && m.amount)
+          .map(m => ({
+            description: m.label,
+            amount: parseFloat(m.amount) || 0,
+          }));
+      } catch (e) {
+        console.error("Error parsing milestones:", e);
+      }
+    }
+
+    // Use budget items from proposedBudget if available, otherwise use milestones
+    if (proposedBudget?.items && Array.isArray(proposedBudget.items) && proposedBudget.items.length > 0) {
+      budgetItems = proposedBudget.items.map(item => ({
+        description: item.description || item.label || "",
+        amount: parseFloat(item.amount) || 0,
+      }));
+    }
+
+    // Calculate total from items
+    const totalAmount = budgetItems.reduce((sum, item) => sum + (item.amount || 0), 0);
+
+    // Prepare proposedBudget object
+    const finalProposedBudget = {
+      amount: totalAmount || (proposedBudget?.amount ? parseFloat(proposedBudget.amount) : 0),
+      currency: proposedBudget?.currency || "SAR",
+      items: budgetItems,
+    };
+
+    // Handle file uploads
+    const attachments = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        try {
+          const folder = `hixa/proposals/${projectId}`;
+          const fileUrl = await uploadFileToCloudinary(file.buffer, folder, file.originalname);
+          
+          // Determine file type
+          let fileType = "other";
+          if (file.mimetype.startsWith("image/")) {
+            fileType = "image";
+          } else if (file.mimetype.includes("pdf")) {
+            fileType = "PDF";
+          } else if (file.mimetype.includes("word") || file.mimetype.includes("document")) {
+            fileType = "DOCX";
+          } else if (file.mimetype.includes("jpg") || file.mimetype.includes("jpeg")) {
+            fileType = "JPG";
+          }
+
+          attachments.push({
+            name: file.originalname,
+            url: fileUrl,
+            type: fileType,
+            size: file.size,
+          });
+        } catch (uploadError) {
+          console.error("Error uploading attachment:", uploadError);
+          // Continue with other files even if one fails
+        }
+      }
+    }
+
     const proposal = await Proposal.create({
       project: projectId,
       engineer: req.user._id, // engineer field can also store company ID
       description,
       estimatedTimeline,
-      relevantExperience,
-      proposedBudget,
+      relevantExperience: relevantExperience || undefined, // Convert empty string to undefined
+      proposedBudget: finalProposedBudget,
+      attachments,
     });
 
     // Increment project's proposals count (soft fail)
@@ -509,7 +598,7 @@ exports.updateProposalStatus = async (req, res, next) => {
 exports.updateProposal = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { description, estimatedTimeline, relevantExperience, proposedBudget, status } = req.body;
+    let { description, estimatedTimeline, relevantExperience, proposedBudget, milestones, status } = req.body;
 
     const proposal = await Proposal.findById(id);
     if (!proposal) {
@@ -536,8 +625,86 @@ exports.updateProposal = async (req, res, next) => {
     if (description !== undefined) proposal.description = description;
     if (estimatedTimeline !== undefined) proposal.estimatedTimeline = estimatedTimeline;
     if (relevantExperience !== undefined) proposal.relevantExperience = relevantExperience;
+    
+    // Handle proposedBudget updates
     if (proposedBudget !== undefined) {
-      proposal.proposedBudget = { ...proposal.proposedBudget, ...proposedBudget };
+      // Parse if string
+      if (typeof proposedBudget === "string") {
+        try {
+          proposedBudget = JSON.parse(proposedBudget);
+        } catch (e) {
+          proposedBudget = { amount: proposedBudget, currency: "SAR", items: [] };
+        }
+      }
+
+      // Parse milestones if provided (legacy support)
+      let budgetItems = [];
+      if (milestones) {
+        try {
+          if (typeof milestones === "string") {
+            milestones = JSON.parse(milestones);
+          }
+          budgetItems = milestones
+            .filter(m => m.label && m.amount)
+            .map(m => ({
+              description: m.label,
+              amount: parseFloat(m.amount) || 0,
+            }));
+        } catch (e) {
+          console.error("Error parsing milestones:", e);
+        }
+      }
+
+      // Use budget items from proposedBudget if available
+      if (proposedBudget?.items && Array.isArray(proposedBudget.items) && proposedBudget.items.length > 0) {
+        budgetItems = proposedBudget.items.map(item => ({
+          description: item.description || item.label || "",
+          amount: parseFloat(item.amount) || 0,
+        }));
+      }
+
+      // Calculate total from items
+      const totalAmount = budgetItems.reduce((sum, item) => sum + (item.amount || 0), 0);
+
+      proposal.proposedBudget = {
+        amount: totalAmount || (proposedBudget?.amount ? parseFloat(proposedBudget.amount) : proposal.proposedBudget?.amount || 0),
+        currency: proposedBudget?.currency || proposal.proposedBudget?.currency || "SAR",
+        items: budgetItems.length > 0 ? budgetItems : (proposedBudget?.items || proposal.proposedBudget?.items || []),
+      };
+    }
+
+    // Handle new file uploads
+    if (req.files && req.files.length > 0) {
+      const newAttachments = [];
+      for (const file of req.files) {
+        try {
+          const folder = `hixa/proposals/${proposal.project}`;
+          const fileUrl = await uploadFileToCloudinary(file.buffer, folder, file.originalname);
+          
+          let fileType = "other";
+          if (file.mimetype.startsWith("image/")) {
+            fileType = "image";
+          } else if (file.mimetype.includes("pdf")) {
+            fileType = "PDF";
+          } else if (file.mimetype.includes("word") || file.mimetype.includes("document")) {
+            fileType = "DOCX";
+          } else if (file.mimetype.includes("jpg") || file.mimetype.includes("jpeg")) {
+            fileType = "JPG";
+          }
+
+          newAttachments.push({
+            name: file.originalname,
+            url: fileUrl,
+            type: fileType,
+            size: file.size,
+          });
+        } catch (uploadError) {
+          console.error("Error uploading attachment:", uploadError);
+        }
+      }
+      
+      // Add new attachments to existing ones
+      proposal.attachments = [...(proposal.attachments || []), ...newAttachments];
     }
 
     // Only admin can change status via this endpoint

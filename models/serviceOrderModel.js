@@ -15,6 +15,12 @@ const ServiceOrderSchema = new mongoose.Schema(
       maxlength: 200,
       match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
     },
+    phone: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 50,
+    },
     status: {
       type: String,
       enum: ["New", "In Review", "Processing", "Completed", "Cancelled"],
@@ -30,6 +36,7 @@ const ServiceOrderSchema = new mongoose.Schema(
 // aya
 ServiceOrderSchema.index({ status: 1 });
 ServiceOrderSchema.index({ email: 1 });
+ServiceOrderSchema.index({ phone: 1 });
 ServiceOrderSchema.index({ createdAt: -1 });
 
 ServiceOrderSchema.set("toJSON", { virtuals: true });

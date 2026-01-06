@@ -98,7 +98,19 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: config.fileUpload?.maxFileUpload || '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-app.use("/api", apiLimiter);
+// Apply rate limiting to API routes, but skip for certain endpoints
+app.use("/api", (req, res, next) => {
+  // Skip rate limiting for OPTIONS requests (CORS preflight)
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+  // Skip rate limiting for health check
+  if (req.path === '/' || req.path === '/health') {
+    return next();
+  }
+  // Apply rate limiter for all other requests
+  apiLimiter(req, res, next);
+});
 app.use(hpp());
 
 /* ===== Deep NoSQL Sanitizer ===== */

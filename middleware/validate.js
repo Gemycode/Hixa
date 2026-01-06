@@ -196,6 +196,7 @@ const validateServiceDetail = (req, res, next) => {
     details_en: Joi.string().max(5000).optional(),
     details_ar: Joi.string().max(5000).optional(),
     image: Joi.string().uri().allow("").optional(),
+    qrCodeImage: Joi.string().uri().allow("").optional(),
   });
 
   const { error } = schema.validate(req.body);
@@ -495,8 +496,19 @@ const validateWorkUpdate = (req, res, next) => {
 // Service Order validation (landing services)
 const validateServiceOrderCreate = (req, res, next) => {
   const schema = Joi.object({
-    email: Joi.string().email({ tlds: { allow: false } }).required(),
-    orderDetails: Joi.string().trim().max(5000).required(),
+    email: Joi.string().email({ tlds: { allow: false } }).required().messages({
+      "any.required": "البريد الإلكتروني مطلوب",
+      "string.email": "البريد الإلكتروني غير صحيح",
+    }),
+    phone: Joi.string().trim().min(5).max(50).required().messages({
+      "any.required": "رقم الهاتف مطلوب",
+      "string.min": "رقم الهاتف يجب أن يكون 5 أحرف على الأقل",
+      "string.max": "رقم الهاتف يجب ألا يتجاوز 50 حرف",
+    }),
+    orderDetails: Joi.string().trim().max(5000).required().messages({
+      "any.required": "تفاصيل الطلب مطلوبة",
+      "string.max": "تفاصيل الطلب يجب ألا تتجاوز 5000 حرف",
+    }),
   });
 
   const { error } = schema.validate(req.body, { abortEarly: false });
@@ -510,6 +522,7 @@ const validateServiceOrderCreate = (req, res, next) => {
 const validateServiceOrderUpdate = (req, res, next) => {
   const schema = Joi.object({
     email: Joi.string().email({ tlds: { allow: false } }).optional(),
+    phone: Joi.string().trim().min(5).max(50).optional(),
     orderDetails: Joi.string().trim().max(5000).optional(),
     status: Joi.string()
       .valid("New", "In Review", "Processing", "Completed", "Cancelled")
@@ -791,14 +804,33 @@ const validateProposalCreate = (req, res, next) => {
       "any.required": "المدة المتوقعة مطلوبة",
       "string.max": "المدة يجب ألا تتجاوز 200 حرف",
     }),
-    relevantExperience: Joi.string().trim().max(3000).optional(),
-    proposedBudget: Joi.object({
-      amount: Joi.number().min(0).optional(),
-      currency: Joi.string().trim().max(10).optional(),
-    }).optional(),
+    relevantExperience: Joi.string().trim().max(3000).allow('', null).optional(),
+    proposedBudget: Joi.alternatives().try(
+      Joi.string(), // يمكن أن يكون JSON string من FormData
+      Joi.object({
+        amount: Joi.number().min(0).optional(),
+        currency: Joi.string().trim().max(10).optional(),
+        items: Joi.array().items(
+          Joi.object({
+            description: Joi.string().trim().max(500).required(),
+            amount: Joi.number().min(0).required(),
+          })
+        ).optional(),
+      })
+    ).optional(),
+    milestones: Joi.alternatives().try(
+      Joi.string(), // يمكن أن يكون JSON string من FormData
+      Joi.array().items(
+        Joi.object({
+          label: Joi.string().trim().max(500).optional(),
+          percentage: Joi.string().optional(),
+          amount: Joi.string().optional(),
+        })
+      )
+    ).optional(),
   });
 
-  const { error } = schema.validate(req.body, { abortEarly: false });
+  const { error } = schema.validate(req.body, { abortEarly: false, allowUnknown: true });
   if (error) {
     const messages = error.details.map((detail) => detail.message).join(", ");
     return res.status(400).json({ message: messages });
@@ -830,11 +862,30 @@ const validateProposalUpdate = (req, res, next) => {
   const schema = Joi.object({
     description: Joi.string().trim().max(5000).optional(),
     estimatedTimeline: Joi.string().trim().max(200).optional(),
-    relevantExperience: Joi.string().trim().max(3000).optional(),
-    proposedBudget: Joi.object({
-      amount: Joi.number().min(0).optional(),
-      currency: Joi.string().trim().max(10).optional(),
-    }).optional(),
+    relevantExperience: Joi.string().trim().max(3000).allow('', null).optional(),
+    proposedBudget: Joi.alternatives().try(
+      Joi.string(), // يمكن أن يكون JSON string من FormData
+      Joi.object({
+        amount: Joi.number().min(0).optional(),
+        currency: Joi.string().trim().max(10).optional(),
+        items: Joi.array().items(
+          Joi.object({
+            description: Joi.string().trim().max(500).required(),
+            amount: Joi.number().min(0).required(),
+          })
+        ).optional(),
+      })
+    ).optional(),
+    milestones: Joi.alternatives().try(
+      Joi.string(), // يمكن أن يكون JSON string من FormData
+      Joi.array().items(
+        Joi.object({
+          label: Joi.string().trim().max(500).optional(),
+          percentage: Joi.string().optional(),
+          amount: Joi.string().optional(),
+        })
+      )
+    ).optional(),
     // status intentionally omitted here; handled separately for admin
   })
     .min(1)
@@ -842,7 +893,7 @@ const validateProposalUpdate = (req, res, next) => {
       "object.min": "يجب إرسال حقل واحد على الأقل للتحديث",
     });
 
-  const { error } = schema.validate(req.body, { abortEarly: false });
+  const { error } = schema.validate(req.body, { abortEarly: false, allowUnknown: true });
   if (error) {
     const messages = error.details.map((detail) => detail.message).join(", ");
     return res.status(400).json({ message: messages });

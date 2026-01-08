@@ -122,9 +122,29 @@ const updateProfile = async (req, res, next) => {
 // Create new user (admin action)
 const createUser = async (req, res, next) => {
   try {
-    const { email, password, name, phone, nationalId, role, isActive } = req.body;
+    const { email, password, name, phone, nationalId, role, isActive, country, city, location, specializations, bio } = req.body;
 
-    const user = await User.create({
+    // Parse specializations if it's a string
+    let parsedSpecializations = [];
+    if (specializations) {
+      if (Array.isArray(specializations)) {
+        parsedSpecializations = specializations;
+      } else if (typeof specializations === 'string') {
+        try {
+          const parsed = JSON.parse(specializations);
+          if (Array.isArray(parsed)) {
+            parsedSpecializations = parsed;
+          } else {
+            parsedSpecializations = [specializations];
+          }
+        } catch (_e) {
+          // If not JSON, treat as single string
+          parsedSpecializations = [specializations];
+        }
+      }
+    }
+
+    const userData = {
       email,
       password,
       name: name || email.split("@")[0],
@@ -132,7 +152,14 @@ const createUser = async (req, res, next) => {
       nationalId: nationalId || "",
       role: role || "customer",
       ...(typeof isActive !== "undefined" && { isActive }),
-    });
+      ...(country && { country }),
+      ...(city && { city }),
+      ...(location && { location }),
+      ...(parsedSpecializations.length > 0 && { specializations: parsedSpecializations }),
+      ...(bio && { bio }),
+    };
+
+    const user = await User.create(userData);
 
     res.status(201).json({
       message: "تم إنشاء المستخدم بنجاح",

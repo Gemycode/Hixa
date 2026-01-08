@@ -553,12 +553,17 @@ const validateUserCreate = (req, res, next) => {
     }),
     name: Joi.string().trim().max(100).optional(),
     phone: Joi.string().trim().max(50).optional(),
-    nationalId: Joi.string().trim().max(20).required().messages({
-      "any.required": "الرقم القومي مطلوب",
-      "string.max": "الرقم القومي يجب ألا يتجاوز 20 حرف",
-    }),
+    nationalId: Joi.string().trim().max(20).allow('', null).optional(),
     role: Joi.string().valid(...roles).optional(),
     isActive: Joi.boolean().optional(),
+    country: Joi.string().trim().max(100).optional(),
+    city: Joi.string().trim().max(100).optional(),
+    location: Joi.string().trim().max(200).optional(),
+    specializations: Joi.alternatives().try(
+      Joi.array().items(Joi.string().trim().max(100)),
+      Joi.string()
+    ).optional(),
+    bio: Joi.string().trim().max(1000).optional(),
   });
 
   const { error } = schema.validate(req.body, { abortEarly: false });

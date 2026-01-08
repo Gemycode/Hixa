@@ -19,6 +19,7 @@ const { apiLimiter, authLimiter } = require('@middleware/security');
 const contentRoutes = require('@routes/contentRoutes');
 const authRoutes = require('@routes/authRoutes');
 const userRoutes = require('@routes/userRoutes');
+const adminRoutes = require('@routes/adminRoutes');
 const subscriberRoutes = require('@routes/subscriberRoutes');
 const projectRoutes = require('@routes/projectRoutes');
 const portfolioRoutes = require('@routes/portfolioRoutes');
@@ -157,6 +158,7 @@ if (process.env.NODE_ENV === 'development') {
 app.use(`${API_PREFIX}auth`, authRoutes);
 app.use(`${API_PREFIX}content`, contentRoutes);
 app.use(`${API_PREFIX}users`, userRoutes);
+app.use(`${API_PREFIX}admin`, adminRoutes);
 app.use(`${API_PREFIX}subscribers`, subscriberRoutes);
 app.use(`${API_PREFIX}projects`, projectRoutes);
 app.use(`${API_PREFIX}portfolio`, portfolioRoutes);

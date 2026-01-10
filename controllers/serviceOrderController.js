@@ -9,6 +9,8 @@ const sanitizeServiceOrder = (order) => {
     phone: o.phone,
     serviceId: o.serviceId || null,
     serviceTitle: o.serviceTitle || null,
+    serviceDetailId: o.serviceDetailId || null,
+    serviceDetailTitle: o.serviceDetailTitle || null,
     status: o.status,
     isActive: o.isActive,
     createdAt: o.createdAt,
@@ -20,7 +22,7 @@ const sanitizeServiceOrder = (order) => {
 exports.createServiceOrder = async (req, res, next) => {
   try {
     console.log('📥 Service Order Request Body:', req.body);
-    const { email, phone, orderDetails, serviceId, title } = req.body;
+    const { email, phone, orderDetails, serviceId, title, serviceDetailId, serviceDetailTitle, detailTitle } = req.body;
 
     const orderData = {
       email,
@@ -28,6 +30,8 @@ exports.createServiceOrder = async (req, res, next) => {
       orderDetails,
       serviceId: serviceId || null,
       serviceTitle: title || null,
+      serviceDetailId: serviceDetailId || null,
+      serviceDetailTitle: serviceDetailTitle || detailTitle || null,
     };
 
     console.log('💾 Creating order with data:', orderData);
@@ -66,6 +70,7 @@ exports.getServiceOrders = async (req, res, next) => {
         { email: regex },
         { phone: regex },
         { serviceTitle: regex },
+        { serviceDetailTitle: regex },
       ];
     }
 
@@ -105,7 +110,7 @@ exports.getServiceOrderById = async (req, res, next) => {
 exports.updateServiceOrder = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { orderDetails, email, phone, status, serviceId, serviceTitle } = req.body;
+    const { orderDetails, email, phone, status, serviceId, serviceTitle, serviceDetailId, serviceDetailTitle } = req.body;
     const order = await ServiceOrder.findById(id);
 
     if (!order || !order.isActive) {
@@ -118,6 +123,8 @@ exports.updateServiceOrder = async (req, res, next) => {
     if (status !== undefined) order.status = status;
     if (serviceId !== undefined) order.serviceId = serviceId;
     if (serviceTitle !== undefined) order.serviceTitle = serviceTitle;
+    if (serviceDetailId !== undefined) order.serviceDetailId = serviceDetailId;
+    if (serviceDetailTitle !== undefined) order.serviceDetailTitle = serviceDetailTitle;
 
     await order.save();
 

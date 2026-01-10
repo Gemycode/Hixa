@@ -530,6 +530,15 @@ const validateServiceOrderCreate = (req, res, next) => {
     title: Joi.string().trim().max(200).allow(null, "").optional().messages({
       "string.max": "عنوان الخدمة يجب ألا يتجاوز 200 حرف",
     }),
+    serviceDetailId: Joi.string().trim().max(100).allow(null, "").optional().messages({
+      "string.max": "معرف تفصيلة الخدمة يجب ألا يتجاوز 100 حرف",
+    }),
+    serviceDetailTitle: Joi.string().trim().max(200).allow(null, "").optional().messages({
+      "string.max": "عنوان تفصيلة الخدمة يجب ألا يتجاوز 200 حرف",
+    }),
+    detailTitle: Joi.string().trim().max(200).allow(null, "").optional().messages({
+      "string.max": "عنوان تفصيلة الخدمة يجب ألا يتجاوز 200 حرف",
+    }),
   });
 
   const { error } = schema.validate(req.body, { abortEarly: false });
@@ -553,6 +562,12 @@ const validateServiceOrderUpdate = (req, res, next) => {
     }),
     serviceTitle: Joi.string().trim().max(200).allow(null, "").optional().messages({
       "string.max": "عنوان الخدمة يجب ألا يتجاوز 200 حرف",
+    }),
+    serviceDetailId: Joi.string().trim().max(100).allow(null, "").optional().messages({
+      "string.max": "معرف تفصيلة الخدمة يجب ألا يتجاوز 100 حرف",
+    }),
+    serviceDetailTitle: Joi.string().trim().max(200).allow(null, "").optional().messages({
+      "string.max": "عنوان تفصيلة الخدمة يجب ألا يتجاوز 200 حرف",
     }),
     status: Joi.string()
       .valid("New", "In Review", "Processing", "Completed", "Cancelled")

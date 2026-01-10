@@ -33,6 +33,18 @@ const ServiceOrderSchema = new mongoose.Schema(
       maxlength: 200,
       default: null,
     },
+    serviceDetailId: {
+      type: String,
+      trim: true,
+      maxlength: 100,
+      default: null,
+    },
+    serviceDetailTitle: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+      default: null,
+    },
     status: {
       type: String,
       enum: ["New", "In Review", "Processing", "Completed", "Cancelled"],
@@ -50,6 +62,7 @@ ServiceOrderSchema.index({ status: 1 });
 ServiceOrderSchema.index({ email: 1 });
 ServiceOrderSchema.index({ phone: 1 });
 ServiceOrderSchema.index({ serviceId: 1 });
+ServiceOrderSchema.index({ serviceDetailId: 1 });
 ServiceOrderSchema.index({ createdAt: -1 });
 
 ServiceOrderSchema.set("toJSON", { virtuals: true });

@@ -293,6 +293,16 @@ const ContentSchema = new mongoose.Schema(
       buttonText_en: { type: String, default: "" },
       buttonText_ar: { type: String, default: "" },
       buttonLink: { type: String, default: "" },
+      location_en: { type: String, default: "" },
+      location_ar: { type: String, default: "" },
+      phone: { type: String, default: "" },
+      social: [
+        {
+          name: { type: String, default: "" },
+          url: { type: String, default: "" },
+          icon: { type: String, default: "" },
+        },
+      ],
     },
     jobs: {
       title_en: { type: String, default: "" },

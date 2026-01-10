@@ -15,6 +15,14 @@ const {
   addProjectItem,
   updateProjectItem,
   deleteProjectItem,
+  updatePartners,
+  addPartnerItem,
+  updatePartnerItem,
+  deletePartnerItem,
+  updateJobs,
+  addJobItem,
+  updateJobItem,
+  deleteJobItem,
   updateFeatures,
   updateCTA,
   updateFooter,
@@ -30,6 +38,10 @@ const {
   validateServiceDetail,
   validateProjects,
   validateProjectItem,
+  validatePartners,
+  validatePartnerItem,
+  validateJobs,
+  validateJobItem,
   validateFeatures,
   validateCTA,
   validateFooter,
@@ -71,6 +83,18 @@ router.put("/projects", protect, restrictTo("admin"), (req, res, next) => {
 router.post("/projects/items", protect, restrictTo("admin"), uploadSingle("image"), validateProjectItem, addProjectItem);
 router.put("/projects/items/:id", protect, restrictTo("admin"), uploadSingle("image"), validateProjectItem, updateProjectItem);
 router.delete("/projects/items/:id", protect, restrictTo("admin"), deleteProjectItem);
+
+// Partners section and items
+router.put("/partners", protect, restrictTo("admin"), validatePartners, updatePartners);
+router.post("/partners/items", protect, restrictTo("admin"), uploadSingle("logo"), validatePartnerItem, addPartnerItem);
+router.put("/partners/items/:id", protect, restrictTo("admin"), uploadSingle("logo"), validatePartnerItem, updatePartnerItem);
+router.delete("/partners/items/:id", protect, restrictTo("admin"), deletePartnerItem);
+
+// Jobs section and items
+router.put("/jobs", protect, restrictTo("admin"), validateJobs, updateJobs);
+router.post("/jobs/items", protect, restrictTo("admin"), validateJobItem, addJobItem);
+router.put("/jobs/items/:id", protect, restrictTo("admin"), validateJobItem, updateJobItem);
+router.delete("/jobs/items/:id", protect, restrictTo("admin"), deleteJobItem);
 
 router.put("/features", protect, restrictTo("admin"), validateFeatures, updateFeatures);
 router.put("/cta", protect, restrictTo("admin"), validateCTA, updateCTA);

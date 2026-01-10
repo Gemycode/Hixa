@@ -345,13 +345,26 @@ const validateFeatures = (req, res, next) => {
 // CTA validation
 const validateCTA = (req, res, next) => {
   const schema = Joi.object({
-    title_en: Joi.string().max(200).optional(),
-    title_ar: Joi.string().max(200).optional(),
-    subtitle_en: Joi.string().max(1000).optional(),
-    subtitle_ar: Joi.string().max(1000).optional(),
-    buttonText_en: Joi.string().max(100).optional(),
-    buttonText_ar: Joi.string().max(100).optional(),
+    title_en: Joi.string().max(200).allow("").optional(),
+    title_ar: Joi.string().max(200).allow("").optional(),
+    subtitle_en: Joi.string().max(1000).allow("").optional(),
+    subtitle_ar: Joi.string().max(1000).allow("").optional(),
+    buttonText_en: Joi.string().max(100).allow("").optional(),
+    buttonText_ar: Joi.string().max(100).allow("").optional(),
     buttonLink: Joi.string().uri().allow("").optional(),
+    location_en: Joi.string().max(200).allow("").optional(),
+    location_ar: Joi.string().max(200).allow("").optional(),
+    phone: Joi.string().max(50).allow("").optional(),
+    social: Joi.array()
+      .items(
+        Joi.object({
+          name: Joi.string().max(50).allow("").optional(),
+          url: Joi.string().uri().allow("").optional(),
+          icon: Joi.string().max(50).allow("").optional(),
+        })
+      )
+      .max(20)
+      .optional(),
   });
 
   const { error } = schema.validate(req.body);
@@ -495,6 +508,8 @@ const validateWorkUpdate = (req, res, next) => {
 
 // Service Order validation (landing services)
 const validateServiceOrderCreate = (req, res, next) => {
+  console.log('🔍 Validating service order request body:', req.body);
+  
   const schema = Joi.object({
     email: Joi.string().email({ tlds: { allow: false } }).required().messages({
       "any.required": "البريد الإلكتروني مطلوب",
@@ -509,13 +524,22 @@ const validateServiceOrderCreate = (req, res, next) => {
       "any.required": "تفاصيل الطلب مطلوبة",
       "string.max": "تفاصيل الطلب يجب ألا تتجاوز 5000 حرف",
     }),
+    serviceId: Joi.string().trim().max(100).allow(null, "").optional().messages({
+      "string.max": "معرف الخدمة يجب ألا يتجاوز 100 حرف",
+    }),
+    title: Joi.string().trim().max(200).allow(null, "").optional().messages({
+      "string.max": "عنوان الخدمة يجب ألا يتجاوز 200 حرف",
+    }),
   });
 
   const { error } = schema.validate(req.body, { abortEarly: false });
   if (error) {
+    console.error('❌ Validation error:', error.details);
     const messages = error.details.map((detail) => detail.message).join(", ");
     return res.status(400).json({ message: messages });
   }
+  
+  console.log('✅ Validation passed');
   next();
 };
 
@@ -524,6 +548,12 @@ const validateServiceOrderUpdate = (req, res, next) => {
     email: Joi.string().email({ tlds: { allow: false } }).optional(),
     phone: Joi.string().trim().min(5).max(50).optional(),
     orderDetails: Joi.string().trim().max(5000).optional(),
+    serviceId: Joi.string().trim().max(100).allow(null, "").optional().messages({
+      "string.max": "معرف الخدمة يجب ألا يتجاوز 100 حرف",
+    }),
+    serviceTitle: Joi.string().trim().max(200).allow(null, "").optional().messages({
+      "string.max": "عنوان الخدمة يجب ألا يتجاوز 200 حرف",
+    }),
     status: Joi.string()
       .valid("New", "In Review", "Processing", "Completed", "Cancelled")
       .optional(),

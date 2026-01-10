@@ -1,6 +1,11 @@
 const errorHandler = (err, req, res, next) => {
   // Log error for debugging
-  console.error("Error:", err);
+  console.error("❌ Error Handler - Error occurred:", err);
+  console.error("❌ Error Handler - Error name:", err.name);
+  console.error("❌ Error Handler - Error message:", err.message);
+  console.error("❌ Error Handler - Error stack:", err.stack);
+  console.error("❌ Error Handler - Request path:", req.path);
+  console.error("❌ Error Handler - Request method:", req.method);
 
   // Multer errors (file upload)
   if (err.name === "MulterError") {

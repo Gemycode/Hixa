@@ -968,16 +968,48 @@ exports.deleteJobItem = async (req, res) => {
 
 // UPDATE CTA section
 exports.updateCTA = async (req, res) => {
-  const { title_en, title_ar, subtitle_en, subtitle_ar, buttonText_en, buttonText_ar, buttonLink } = req.body;
-  await updateSection("cta", {
-    title_en,
-    title_ar,
-    subtitle_en,
-    subtitle_ar,
-    buttonText_en,
-    buttonText_ar,
-    buttonLink,
-  }, res);
+  try {
+    const { 
+      title_en, 
+      title_ar, 
+      subtitle_en, 
+      subtitle_ar, 
+      buttonText_en, 
+      buttonText_ar, 
+      buttonLink,
+      location_en,
+      location_ar,
+      phone,
+      social
+    } = req.body;
+
+    const updateFields = {
+      "cta.title_en": title_en,
+      "cta.title_ar": title_ar,
+      "cta.subtitle_en": subtitle_en,
+      "cta.subtitle_ar": subtitle_ar,
+      "cta.buttonText_en": buttonText_en,
+      "cta.buttonText_ar": buttonText_ar,
+      "cta.buttonLink": buttonLink,
+      "cta.location_en": location_en,
+      "cta.location_ar": location_ar,
+      "cta.phone": phone,
+      "cta.social": social || [],
+    };
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $set: updateFields },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    res.json({
+      message: "تم تحديث CTA بنجاح",
+      data: updated.cta,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
 };
 
 // UPDATE footer section
@@ -1270,16 +1302,48 @@ exports.deleteJobItem = async (req, res) => {
 
 // UPDATE CTA section
 exports.updateCTA = async (req, res) => {
-  const { title_en, title_ar, subtitle_en, subtitle_ar, buttonText_en, buttonText_ar, buttonLink } = req.body;
-  await updateSection("cta", {
-    title_en,
-    title_ar,
-    subtitle_en,
-    subtitle_ar,
-    buttonText_en,
-    buttonText_ar,
-    buttonLink,
-  }, res);
+  try {
+    const { 
+      title_en, 
+      title_ar, 
+      subtitle_en, 
+      subtitle_ar, 
+      buttonText_en, 
+      buttonText_ar, 
+      buttonLink,
+      location_en,
+      location_ar,
+      phone,
+      social
+    } = req.body;
+
+    const updateFields = {
+      "cta.title_en": title_en,
+      "cta.title_ar": title_ar,
+      "cta.subtitle_en": subtitle_en,
+      "cta.subtitle_ar": subtitle_ar,
+      "cta.buttonText_en": buttonText_en,
+      "cta.buttonText_ar": buttonText_ar,
+      "cta.buttonLink": buttonLink,
+      "cta.location_en": location_en,
+      "cta.location_ar": location_ar,
+      "cta.phone": phone,
+      "cta.social": social || [],
+    };
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $set: updateFields },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    res.json({
+      message: "تم تحديث CTA بنجاح",
+      data: updated.cta,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في الخادم", error: err.message });
+  }
 };
 
 // UPDATE footer section

@@ -7,6 +7,8 @@ const sanitizeServiceOrder = (order) => {
     orderDetails: o.orderDetails,
     email: o.email,
     phone: o.phone,
+    serviceId: o.serviceId || null,
+    serviceTitle: o.serviceTitle || null,
     status: o.status,
     isActive: o.isActive,
     createdAt: o.createdAt,
@@ -17,19 +19,31 @@ const sanitizeServiceOrder = (order) => {
 // Public: create a service order (landing modal form) - minimal fields
 exports.createServiceOrder = async (req, res, next) => {
   try {
-    const { email, phone, orderDetails } = req.body;
+    console.log('📥 Service Order Request Body:', req.body);
+    const { email, phone, orderDetails, serviceId, title } = req.body;
 
-    const order = await ServiceOrder.create({
+    const orderData = {
       email,
       phone,
       orderDetails,
-    });
+      serviceId: serviceId || null,
+      serviceTitle: title || null,
+    };
+
+    console.log('💾 Creating order with data:', orderData);
+
+    const order = await ServiceOrder.create(orderData);
+
+    console.log('✅ Order created successfully:', order._id);
 
     res.status(201).json({
       message: "تم إرسال طلب الخدمة بنجاح",
       data: sanitizeServiceOrder(order),
     });
   } catch (error) {
+    console.error('❌ Error creating service order:', error);
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Error stack:', error.stack);
     next(error);
   }
 };
@@ -47,7 +61,12 @@ exports.getServiceOrders = async (req, res, next) => {
     if (email) filters.email = new RegExp(email, "i");
     if (search) {
       const regex = new RegExp(search, "i");
-      filters.$or = [{ orderDetails: regex }, { email: regex }, { phone: regex }];
+      filters.$or = [
+        { orderDetails: regex },
+        { email: regex },
+        { phone: regex },
+        { serviceTitle: regex },
+      ];
     }
 
     const [orders, total] = await Promise.all([
@@ -86,7 +105,7 @@ exports.getServiceOrderById = async (req, res, next) => {
 exports.updateServiceOrder = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { orderDetails, email, phone, status } = req.body;
+    const { orderDetails, email, phone, status, serviceId, serviceTitle } = req.body;
     const order = await ServiceOrder.findById(id);
 
     if (!order || !order.isActive) {
@@ -97,6 +116,8 @@ exports.updateServiceOrder = async (req, res, next) => {
     if (email !== undefined) order.email = email;
     if (phone !== undefined) order.phone = phone;
     if (status !== undefined) order.status = status;
+    if (serviceId !== undefined) order.serviceId = serviceId;
+    if (serviceTitle !== undefined) order.serviceTitle = serviceTitle;
 
     await order.save();
 

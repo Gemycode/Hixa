@@ -13,7 +13,11 @@ const { protect, restrictTo } = require("../middleware/auth");
 const { validateServiceOrderCreate, validateServiceOrderUpdate } = require("../middleware/validate");
 
 // Public submit
-router.post("/", validateServiceOrderCreate, createServiceOrder);
+router.post("/", (req, res, next) => {
+  console.log('📥 Service Order Route - POST /service-orders received');
+  console.log('📥 Request body:', req.body);
+  next();
+}, validateServiceOrderCreate, createServiceOrder);
 
 // Admin management
 router.use(protect, restrictTo("admin"));

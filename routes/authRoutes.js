@@ -7,7 +7,11 @@ const {
   registerCompany, 
   registerEngineer, 
   registerClient,
-  login 
+  login,
+  refreshToken,
+  logout,
+  forgotPassword,
+  resetPassword
 } = require("../controllers/authController");
 
 const { changePassword } = require("../controllers/userController");
@@ -18,7 +22,9 @@ const {
   validateRegisterEngineer,
   validateRegisterClient,
   validateLogin,
-  validatePasswordChange
+  validatePasswordChange,
+  validateForgotPassword,
+  validateResetPassword
 } = require("../middleware/validate");
 
 const { protect } = require("../middleware/auth");
@@ -42,7 +48,19 @@ router.post("/register/client", authLimiter, validateRegisterClient, registerCli
 // Login
 router.post("/login", authLimiter, validateLogin, login);
 
+// Refresh Token - Get new access token using refresh token from cookie
+router.post("/refresh", refreshToken);
+
+// Logout - Clear refresh token cookie
+router.post("/logout", logout);
+
 // Change password
 router.put("/change-password", protect, authLimiter, validatePasswordChange, changePassword);
+
+// Forgot password (public - no auth required)
+router.post("/forgot-password", authLimiter, validateForgotPassword, forgotPassword);
+
+// Reset password (public - no auth required, but needs valid token)
+router.post("/reset-password", authLimiter, validateResetPassword, resetPassword);
 
 module.exports = router;

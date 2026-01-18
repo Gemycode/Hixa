@@ -44,6 +44,13 @@ const sanitizeWork = (work) => {
 // CREATE work (Engineer/Admin)
 exports.createWork = async (req, res, next) => {
   try {
+    // Debug: Log received data
+    console.log("🔍 createWork - req.body:", req.body);
+    console.log("🔍 createWork - category:", req.body?.category);
+    console.log("🔍 createWork - category type:", typeof req.body?.category);
+    console.log("🔍 createWork - category length:", req.body?.category?.length);
+    console.log("🔍 createWork - category char codes:", req.body?.category?.split('').map(c => c.charCodeAt(0)));
+    
     const { title, category, date, description, location, client, status, keyFeatures } = req.body;
     const mainImageFile = req.files?.image?.[0];
     const galleryFiles = req.files?.gallery || [];

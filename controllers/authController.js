@@ -1,12 +1,49 @@
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const User = require("../models/userModel");
+const { sendPasswordResetEmail } = require("../utils/emailService");
 
-const generateToken = (userId, role) => {
+// Generate Access Token (short-lived, 15 minutes)
+const generateAccessToken = (userId, role) => {
+  const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
   return jwt.sign(
-    { sub: userId, role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || "1d", issuer: "hixa-api" }
+    { sub: userId, role, type: 'access' },
+    secret,
+    { expiresIn: process.env.JWT_EXPIRES_IN || "15m", issuer: "hixa-api" }
   );
+};
+
+// Generate Refresh Token (long-lived, 7 days)
+const generateRefreshToken = (userId) => {
+  const secret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+  return jwt.sign(
+    { sub: userId, type: 'refresh' },
+    secret,
+    { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d", issuer: "hixa-api" }
+  );
+};
+
+// Backward compatibility - use access token
+const generateToken = (userId, role) => {
+  return generateAccessToken(userId, role);
+};
+
+// Helper function to set refresh token cookie with consistent options
+const setRefreshTokenCookie = (res, refreshToken) => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  // With Vite proxy, requests appear as same-origin, so sameSite: 'lax' works in development
+  // In production, use strict sameSite with secure
+  const cookieOptions = {
+    httpOnly: true,
+    secure: isProduction, // Only send over HTTPS in production
+    sameSite: isProduction ? "strict" : "lax", // lax for same-origin (via proxy) in dev, strict for same-origin in prod
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: "/",
+  };
+  
+  res.cookie("refreshToken", refreshToken, cookieOptions);
+  console.log("🍪 Refresh token cookie set with options:", { ...cookieOptions, refreshToken: '[HIDDEN]' });
 };
 
 // General register (backward compatibility)
@@ -27,11 +64,15 @@ const register = async (req, res) => {
       countryCode: countryCode || ""
     });
 
-    const token = generateToken(user._id, user.role);
+    const accessToken = generateAccessToken(user._id, user.role);
+    const refreshToken = generateRefreshToken(user._id);
     user.lastLogin = new Date();
     await user.save();
 
-    res.status(201).json({ message: "تم التسجيل بنجاح", token, user });
+    // Set refresh token in HttpOnly cookie
+    setRefreshTokenCookie(res, refreshToken);
+
+    res.status(201).json({ message: "تم التسجيل بنجاح", token: accessToken, accessToken, user });
   } catch (e) {
     res.status(500).json({ message: "خطأ في الخادم", error: e.message });
   }
@@ -61,13 +102,18 @@ const registerCompany = async (req, res) => {
       await user.save();
     }
 
-    const token = generateToken(user._id, user.role);
+    const accessToken = generateAccessToken(user._id, user.role);
+    const refreshToken = generateRefreshToken(user._id);
     user.lastLogin = new Date();
     await user.save();
 
+    // Set refresh token in HttpOnly cookie
+    setRefreshTokenCookie(res, refreshToken);
+
     res.status(201).json({ 
       message: "تم تسجيل الشركة بنجاح", 
-      token, 
+      token: accessToken,
+      accessToken,
       user: {
         _id: user._id,
         email: user.email,
@@ -108,13 +154,18 @@ const registerEngineer = async (req, res) => {
       specializations: specialization ? [specialization] : [], // حفظ specialization
     });
 
-    const token = generateToken(user._id, user.role);
+    const accessToken = generateAccessToken(user._id, user.role);
+    const refreshToken = generateRefreshToken(user._id);
     user.lastLogin = new Date();
     await user.save();
 
+    // Set refresh token in HttpOnly cookie
+    setRefreshTokenCookie(res, refreshToken);
+
     res.status(201).json({ 
       message: "تم تسجيل المهندس بنجاح", 
-      token, 
+      token: accessToken,
+      accessToken,
       user: {
         _id: user._id,
         email: user.email,
@@ -151,13 +202,18 @@ const registerClient = async (req, res) => {
       countryCode: countryCode || "",
     });
 
-    const token = generateToken(user._id, user.role);
+    const accessToken = generateAccessToken(user._id, user.role);
+    const refreshToken = generateRefreshToken(user._id);
     user.lastLogin = new Date();
     await user.save();
 
+    // Set refresh token in HttpOnly cookie
+    setRefreshTokenCookie(res, refreshToken);
+
     res.status(201).json({ 
       message: "تم تسجيل العميل بنجاح", 
-      token, 
+      token: accessToken,
+      accessToken,
       user: {
         _id: user._id,
         email: user.email,
@@ -184,20 +240,199 @@ const login = async (req, res) => {
 
     if (!user.isActive) return res.status(403).json({ message: "الحساب غير مفعّل" });
 
-    // تحديد مدة صلاحية الـ token بناءً على rememberMe
-    const expiresIn = rememberMe ? process.env.JWT_EXPIRES_IN_LONG || "30d" : process.env.JWT_EXPIRES_IN || "1d";
-    const token = jwt.sign(
-      { sub: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn, issuer: "hixa-api" }
-    );
+    // Generate Access Token (short-lived)
+    const accessToken = generateAccessToken(user._id, user.role);
+    
+    // Generate Refresh Token (long-lived)
+    const refreshToken = generateRefreshToken(user._id);
     
     user.lastLogin = new Date();
     await user.save({ validateBeforeSave: false });
 
-    res.json({ message: "تم تسجيل الدخول بنجاح", token, user });
+    // Set refresh token in HttpOnly cookie
+    setRefreshTokenCookie(res, refreshToken);
+
+    // Send access token in response body
+    res.json({ 
+      message: "تم تسجيل الدخول بنجاح", 
+      token: accessToken, // Access token for Authorization header
+      accessToken: accessToken, // Also send as accessToken for clarity
+      user 
+    });
   } catch (e) {
     res.status(500).json({ message: "خطأ في الخادم", error: e.message });
+  }
+};
+
+// Forgot Password - Send reset email
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    
+    // Don't reveal if email exists or not (security best practice)
+    if (!user) {
+      // Still return success to prevent email enumeration
+      return res.json({ 
+        message: "إذا كان البريد الإلكتروني مسجلاً، سيتم إرسال رابط إعادة التعيين" 
+      });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    
+    // Set token and expiration (1 hour)
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpire = Date.now() + 60 * 60 * 1000; // 1 hour
+    await user.save({ validateBeforeSave: false });
+
+    // Create reset URL
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password`;
+    
+    try {
+      await sendPasswordResetEmail(user.email, resetToken, resetUrl);
+      res.json({ 
+        message: "تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني" 
+      });
+    } catch (emailError) {
+      // If email fails, clear the token
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save({ validateBeforeSave: false });
+      
+      console.error('Email error:', emailError);
+      return res.status(500).json({ 
+        message: "حدث خطأ أثناء إرسال البريد الإلكتروني. يرجى المحاولة لاحقاً" 
+      });
+    }
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
+  }
+};
+
+// Reset Password - Update password with token
+const resetPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({ 
+        message: "الرمز وكلمة المرور مطلوبان" 
+      });
+    }
+
+    // Hash the token to compare with stored token
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    // Find user with valid token and not expired
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpire: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ 
+        message: "الرمز غير صحيح أو منتهي الصلاحية" 
+      });
+    }
+
+    // Validate password strength
+    if (password.length < 8) {
+      return res.status(400).json({ 
+        message: "كلمة المرور يجب أن تكون 8 أحرف على الأقل" 
+      });
+    }
+
+    // Set new password (will be hashed by pre-save hook)
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    res.json({ 
+      message: "تم إعادة تعيين كلمة المرور بنجاح" 
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
+  }
+};
+
+// Refresh Access Token - Generate new access token using refresh token from cookie
+const refreshToken = async (req, res) => {
+  try {
+    console.log("🔄 Refresh token request received");
+    console.log("🔄 Cookies:", req.cookies);
+    const refreshTokenCookie = req.cookies?.refreshToken;
+
+    if (!refreshTokenCookie) {
+      console.log("❌ No refresh token cookie found");
+      return res.status(401).json({ message: "Refresh token غير موجود" });
+    }
+
+    try {
+      const secret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+      const decoded = jwt.verify(refreshTokenCookie, secret);
+
+      // Verify token is a refresh token
+      if (decoded.type !== 'refresh') {
+        return res.status(403).json({ message: "نوع التوكن غير صحيح" });
+      }
+
+      // Get user to get role
+      const user = await User.findById(decoded.sub);
+      if (!user) {
+        return res.status(401).json({ message: "المستخدم غير موجود" });
+      }
+
+      if (!user.isActive) {
+        return res.status(403).json({ message: "الحساب غير مفعّل" });
+      }
+
+      // Generate new access token
+      const newAccessToken = generateAccessToken(user._id, user.role);
+
+      console.log("✅ Refresh token valid - generating new access token for user:", user.email);
+      res.json({ 
+        accessToken: newAccessToken,
+        token: newAccessToken, // For backward compatibility
+        user: {
+          _id: user._id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        }
+      });
+    } catch (jwtError) {
+      if (jwtError.name === "TokenExpiredError") {
+        return res.status(401).json({ message: "انتهت صلاحية Refresh Token" });
+      }
+      return res.status(403).json({ message: "Refresh token غير صحيح" });
+    }
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
+  }
+};
+
+// Logout - Clear refresh token cookie
+const logout = async (req, res) => {
+  try {
+    const isProduction = process.env.NODE_ENV === 'production';
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "strict" : "lax",
+      path: "/",
+    });
+    
+    res.json({ message: "تم تسجيل الخروج بنجاح" });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
   }
 };
 
@@ -206,5 +441,9 @@ module.exports = {
   registerCompany,
   registerEngineer,
   registerClient,
-  login 
+  login,
+  refreshToken,
+  logout,
+  forgotPassword,
+  resetPassword
 };

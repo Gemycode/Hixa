@@ -9,6 +9,7 @@ const http = require('http');
 const NodeCache = require('node-cache');
 const helmet = require('helmet');
 const hpp = require('hpp');
+const cookieParser = require('cookie-parser');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
@@ -24,6 +25,7 @@ const subscriberRoutes = require('@routes/subscriberRoutes');
 const projectRoutes = require('@routes/projectRoutes');
 const portfolioRoutes = require('@routes/portfolioRoutes');
 const serviceOrderRoutes = require('@routes/serviceOrderRoutes');
+const partnerRequestRoutes = require('@routes/partnerRequestRoutes');
 const proposalRoutes = require('@routes/proposalRoutes');
 const projectRoomRoutes = require('@routes/projectRoomRoutes');
 const chatRoomRoutes = require('@routes/chatRoomRoutes');
@@ -98,6 +100,7 @@ app.use(cors(corsOptions));
 
 app.use(express.json({ limit: config.fileUpload?.maxFileUpload || '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser()); // Parse cookies for refresh token
 
 // Apply rate limiting to API routes, but skip for certain endpoints
 app.use("/api", (req, res, next) => {
@@ -163,6 +166,7 @@ app.use(`${API_PREFIX}subscribers`, subscriberRoutes);
 app.use(`${API_PREFIX}projects`, projectRoutes);
 app.use(`${API_PREFIX}portfolio`, portfolioRoutes);
 app.use(`${API_PREFIX}service-orders`, serviceOrderRoutes);
+app.use(`${API_PREFIX}partner-requests`, partnerRequestRoutes);
 app.use(`${API_PREFIX}proposals`, proposalRoutes);
 app.use(`${API_PREFIX}project-rooms`, projectRoomRoutes);
 app.use(`${API_PREFIX}chat-rooms`, chatRoomRoutes);

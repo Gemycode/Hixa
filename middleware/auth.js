@@ -21,7 +21,9 @@ const protect = async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Use JWT_ACCESS_SECRET or fallback to JWT_SECRET for backward compatibility
+    const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET;
+    const decoded = jwt.verify(token, secret);
 
     const user = await User.findById(decoded.sub).select("-password");
     if (!user) return res.status(401).json({ message: "المستخدم غير موجود" });

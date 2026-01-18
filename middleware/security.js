@@ -1,4 +1,5 @@
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = require('express-rate-limit');
 const helmet = require('helmet');
 const xss = require('xss-clean');
 const hpp = require('hpp');
@@ -45,14 +46,16 @@ const apiLimiter = rateLimit({
     }
     return false;
   },
-  // Better IP detection
+  // Better IP detection using ipKeyGenerator helper for IPv6 support
   keyGenerator: (req) => {
-    // Try to get real IP from various headers (for proxies/load balancers)
-    return req.ip || 
+    // Use the helper function for IPv6 support
+    const ip = ipKeyGenerator(req);
+    // If helper doesn't work, fallback to manual detection
+    return ip || 
            req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 
            req.headers['x-real-ip'] || 
-           req.connection.remoteAddress || 
-           req.socket.remoteAddress ||
+           req.connection?.remoteAddress || 
+           req.socket?.remoteAddress ||
            'unknown';
   },
 });

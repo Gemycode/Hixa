@@ -415,6 +415,12 @@ const validateFooter = (req, res, next) => {
 const workStatuses = ["Pending Review", "In Progress", "Completed"];
 
 const validateWork = (req, res, next) => {
+  // Debug: Log received data
+  console.log("🔍 validateWork - req.body:", req.body);
+  console.log("🔍 validateWork - category value:", req.body?.category);
+  console.log("🔍 validateWork - category type:", typeof req.body?.category);
+  console.log("🔍 validateWork - category length:", req.body?.category?.length);
+  
   const schema = Joi.object({
     title: Joi.string().trim().max(200).required(),
     category: Joi.string().trim().max(100).valid(
@@ -452,9 +458,11 @@ const validateWork = (req, res, next) => {
 
   const { error } = schema.validate(req.body, { abortEarly: false });
   if (error) {
+    console.error("❌ validateWork - Validation errors:", error.details);
     const messages = error.details.map((detail) => detail.message).join(", ");
     return res.status(400).json({ message: messages });
   }
+  console.log("✅ validateWork - Validation passed");
   next();
 };
 
@@ -549,6 +557,78 @@ const validateServiceOrderCreate = (req, res, next) => {
   }
   
   console.log('✅ Validation passed');
+  next();
+};
+
+// Partner Request validation
+const validatePartnerRequestCreate = (req, res, next) => {
+  console.log('🔍 Validating partner request body:', req.body);
+  
+  const schema = Joi.object({
+    companyName: Joi.string().trim().min(2).max(200).required().messages({
+      "any.required": "اسم الشركة مطلوب",
+      "string.min": "اسم الشركة يجب أن يكون حرفين على الأقل",
+      "string.max": "اسم الشركة يجب ألا يتجاوز 200 حرف",
+    }),
+    businessType: Joi.string().trim().min(2).max(100).required().messages({
+      "any.required": "نوع العمل مطلوب",
+      "string.min": "نوع العمل يجب أن يكون حرفين على الأقل",
+      "string.max": "نوع العمل يجب ألا يتجاوز 100 حرف",
+    }),
+    description: Joi.string().trim().max(2000).allow("").optional().messages({
+      "string.max": "الوصف يجب ألا يتجاوز 2000 حرف",
+    }),
+    phone: Joi.string().trim().min(5).max(50).required().messages({
+      "any.required": "رقم الهاتف مطلوب",
+      "string.min": "رقم الهاتف يجب أن يكون 5 أحرف على الأقل",
+      "string.max": "رقم الهاتف يجب ألا يتجاوز 50 حرف",
+    }),
+    email: Joi.string().email({ tlds: { allow: false } }).required().messages({
+      "any.required": "البريد الإلكتروني مطلوب",
+      "string.email": "البريد الإلكتروني غير صحيح",
+    }),
+    city: Joi.string().trim().min(2).max(100).required().messages({
+      "any.required": "المدينة مطلوبة",
+      "string.min": "المدينة يجب أن تكون حرفين على الأقل",
+      "string.max": "المدينة يجب ألا تتجاوز 100 حرف",
+    }),
+    adType: Joi.string().valid("عادي", "مميز", "premium", "normal").optional().messages({
+      "any.only": "نوع الإعلان يجب أن يكون: عادي، مميز، premium، أو normal",
+    }),
+  });
+
+  const { error } = schema.validate(req.body, { abortEarly: false });
+  if (error) {
+    console.error('❌ Validation error:', error.details);
+    const messages = error.details.map((detail) => detail.message).join(", ");
+    return res.status(400).json({ message: messages });
+  }
+  
+  console.log('✅ Validation passed');
+  next();
+};
+
+const validatePartnerRequestUpdate = (req, res, next) => {
+  const schema = Joi.object({
+    companyName: Joi.string().trim().min(2).max(200).optional(),
+    businessType: Joi.string().trim().min(2).max(100).optional(),
+    description: Joi.string().trim().max(2000).allow("").optional(),
+    phone: Joi.string().trim().min(5).max(50).optional(),
+    email: Joi.string().email({ tlds: { allow: false } }).optional(),
+    city: Joi.string().trim().min(2).max(100).optional(),
+    adType: Joi.string().valid("عادي", "مميز", "premium", "normal").optional(),
+    status: Joi.string().valid("New", "In Review", "Approved", "Rejected").optional(),
+  })
+    .min(1)
+    .messages({
+      "object.min": "يجب إرسال حقل واحد على الأقل للتحديث",
+    });
+
+  const { error } = schema.validate(req.body, { abortEarly: false });
+  if (error) {
+    const messages = error.details.map((detail) => detail.message).join(", ");
+    return res.status(400).json({ message: messages });
+  }
   next();
 };
 
@@ -1173,6 +1253,49 @@ const validateRegisterClient = (req, res, next) => {
 };
 
 // Password change validation
+// Validate forgot password request
+const validateForgotPassword = (req, res, next) => {
+  const schema = Joi.object({
+    email: Joi.string().email({ tlds: { allow: false } }).required().messages({
+      "string.email": "البريد الإلكتروني غير صحيح",
+      "any.required": "البريد الإلكتروني مطلوب",
+    }),
+  });
+
+  const { error } = schema.validate(req.body, { abortEarly: false });
+  if (error) {
+    const messages = error.details.map((detail) => detail.message).join(", ");
+    return res.status(400).json({ message: messages });
+  }
+  next();
+};
+
+// Validate reset password request
+const validateResetPassword = (req, res, next) => {
+  const schema = Joi.object({
+    token: Joi.string().required().messages({
+      "any.required": "رمز إعادة التعيين مطلوب",
+    }),
+    password: Joi.string()
+      .min(8)
+      .pattern(passwordRegex)
+      .required()
+      .messages({
+        "string.min": "كلمة المرور يجب أن تكون 8 أحرف على الأقل",
+        "string.pattern.base":
+          "كلمة المرور يجب أن تحتوي على حرف كبير، حرف صغير، ورقم واحد على الأقل",
+        "any.required": "كلمة المرور مطلوبة",
+      }),
+  });
+
+  const { error } = schema.validate(req.body, { abortEarly: false });
+  if (error) {
+    const messages = error.details.map((detail) => detail.message).join(", ");
+    return res.status(400).json({ message: messages });
+  }
+  next();
+};
+
 const validatePasswordChange = (req, res, next) => {
   const schema = Joi.object({
     currentPassword: Joi.string().required().messages({
@@ -1428,6 +1551,8 @@ module.exports = {
   validateRegisterClient,
   validateLogin,
   validatePasswordChange,
+  validateForgotPassword,
+  validateResetPassword,
   
   // Messages
   validateMessageCreate, // Use Joi validation (handles FormData better)
@@ -1458,6 +1583,8 @@ module.exports = {
   validateWorkUpdate,
   validateServiceOrderCreate,
   validateServiceOrderUpdate,
+  validatePartnerRequestCreate,
+  validatePartnerRequestUpdate,
   validateUserCreate,
   validateUserUpdate,
   validateSubscribe,

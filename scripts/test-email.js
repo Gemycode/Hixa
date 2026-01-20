@@ -17,7 +17,7 @@ console.log('  SMTP_PORT:', process.env.SMTP_PORT || '❌ NOT SET');
 console.log('  SMTP_SECURE:', process.env.SMTP_SECURE || '❌ NOT SET');
 console.log('  SMTP_USER:', process.env.SMTP_USER || process.env.EMAIL_USER || '❌ NOT SET');
 console.log('  SMTP_PASS:', process.env.SMTP_PASS || process.env.EMAIL_PASSWORD || process.env.EMAIL_PASS ? '✅ SET (hidden)' : '❌ NOT SET');
-console.log('  FRONTEND_URL:', process.env.FRONTEND_URL || '❌ NOT SET (will use default)');
+console.log('  PASSWORD_RESET_URL:', process.env.PASSWORD_RESET_URL || process.env.FRONTEND_URL || '❌ NOT SET (will use default)');
 console.log('');
 
 // Validate required variables

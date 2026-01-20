@@ -304,14 +304,14 @@ const forgotPassword = async (req, res) => {
 
     console.log('✅ Reset token saved to user');
 
-    // Create reset URL
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const resetUrl = `${frontendUrl}/reset-password`;
+    // Create reset URL - use PASSWORD_RESET_URL to avoid conflict with other FRONTEND_URL
+    const passwordResetUrl = process.env.PASSWORD_RESET_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+    const resetUrl = `${passwordResetUrl}/reset-password`;
     
     console.log('📧 Preparing to send email:', {
       to: user.email,
       resetUrl: resetUrl,
-      frontendUrl: frontendUrl,
+      passwordResetUrl: passwordResetUrl,
     });
     
     try {

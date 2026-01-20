@@ -267,17 +267,31 @@ const login = async (req, res) => {
 // Forgot Password - Send reset email
 const forgotPassword = async (req, res) => {
   try {
+    console.log('🔐 Forgot password request received:', {
+      email: req.body.email,
+      hasEmail: !!req.body.email,
+    });
+
     const { email } = req.body;
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({ 
+        message: "البريد الإلكتروني مطلوب" 
+      });
+    }
 
     const user = await User.findOne({ email: email.toLowerCase().trim() });
     
     // Don't reveal if email exists or not (security best practice)
     if (!user) {
+      console.log('⚠️ User not found for email:', email);
       // Still return success to prevent email enumeration
       return res.json({ 
         message: "إذا كان البريد الإلكتروني مسجلاً، سيتم إرسال رابط إعادة التعيين" 
       });
     }
+
+    console.log('✅ User found, generating reset token for:', user.email);
 
     // Generate reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
@@ -288,11 +302,21 @@ const forgotPassword = async (req, res) => {
     user.resetPasswordExpire = Date.now() + 60 * 60 * 1000; // 1 hour
     await user.save({ validateBeforeSave: false });
 
+    console.log('✅ Reset token saved to user');
+
     // Create reset URL
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password`;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const resetUrl = `${frontendUrl}/reset-password`;
+    
+    console.log('📧 Preparing to send email:', {
+      to: user.email,
+      resetUrl: resetUrl,
+      frontendUrl: frontendUrl,
+    });
     
     try {
       await sendPasswordResetEmail(user.email, resetToken, resetUrl);
+      console.log('✅ Password reset email sent successfully');
       res.json({ 
         message: "تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني" 
       });
@@ -302,14 +326,31 @@ const forgotPassword = async (req, res) => {
       user.resetPasswordExpire = undefined;
       await user.save({ validateBeforeSave: false });
       
-      console.error('Email error:', emailError);
+      console.error('❌ Email error in forgotPassword:', {
+        message: emailError.message,
+        stack: emailError.stack,
+      });
+      
+      // Return more specific error message
+      const errorMessage = emailError.message || "حدث خطأ أثناء إرسال البريد الإلكتروني. يرجى المحاولة لاحقاً";
       return res.status(500).json({ 
-        message: "حدث خطأ أثناء إرسال البريد الإلكتروني. يرجى المحاولة لاحقاً" 
+        message: errorMessage,
+        ...(process.env.NODE_ENV === 'development' && { 
+          error: emailError.message,
+          details: emailError.code 
+        })
       });
     }
   } catch (error) {
-    console.error('Forgot password error:', error);
-    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
+    console.error('❌ Forgot password error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+    });
+    res.status(500).json({ 
+      message: "خطأ في الخادم", 
+      ...(process.env.NODE_ENV === 'development' && { error: error.message })
+    });
   }
 };
 

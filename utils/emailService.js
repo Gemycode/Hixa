@@ -11,23 +11,68 @@ const createTransporter = () => {
       user: process.env.SMTP_USER || process.env.EMAIL_USER,
       pass: process.env.SMTP_PASS || process.env.EMAIL_PASSWORD || process.env.EMAIL_PASS,
     },
+    // Connection timeout options for Mailtrap and other services
+    connectionTimeout: 120000, // 120 seconds (2 minutes) - increased for Mailtrap
+    socketTimeout: 120000, // 120 seconds (2 minutes)
+    greetingTimeout: 60000, // 60 seconds - increased for slow connections
+    // Retry options
+    pool: false,
+    maxConnections: 1,
+    maxMessages: 3,
   };
+
+  // Log configuration (without password) for debugging
+  console.log('📧 Email Service Configuration:', {
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    user: config.auth.user,
+    hasPassword: !!config.auth.pass,
+  });
+
+  // Validate required configuration
+  if (!config.auth.user) {
+    throw new Error('SMTP_USER or EMAIL_USER environment variable is required');
+  }
+  if (!config.auth.pass) {
+    throw new Error('SMTP_PASS, EMAIL_PASSWORD, or EMAIL_PASS environment variable is required');
+  }
 
   // If using Gmail, you might need an App Password instead of regular password
   // Generate App Password: https://myaccount.google.com/apppasswords
 
-  return nodemailer.createTransport(config);
+  const transporter = nodemailer.createTransport(config);
+  
+  // For Mailtrap and testing, we can skip verification
+  // Verification will be done when actually sending email
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('⚠️ Skipping transporter verification in development mode');
+  }
+
+  return transporter;
 };
 
 // Send password reset email
 const sendPasswordResetEmail = async (email, resetToken, resetUrl) => {
   try {
+    console.log('📧 Attempting to send password reset email:', {
+      to: email,
+      resetUrl: resetUrl,
+      hasToken: !!resetToken,
+      tokenLength: resetToken?.length,
+    });
+
     const transporter = createTransporter();
 
     const resetLink = `${resetUrl}?token=${resetToken}`;
     
+    const fromEmail = process.env.SMTP_USER || process.env.EMAIL_USER;
+    if (!fromEmail) {
+      throw new Error('SMTP_USER or EMAIL_USER environment variable is required');
+    }
+    
     const mailOptions = {
-      from: `"Hixa" <${process.env.SMTP_USER || process.env.EMAIL_USER}>`,
+      from: `"Hixa" <${fromEmail}>`,
       to: email,
       subject: 'إعادة تعيين كلمة المرور - Password Reset',
       html: `
@@ -106,12 +151,68 @@ const sendPasswordResetEmail = async (email, resetToken, resetUrl) => {
       `,
     };
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Password reset email sent:', info.messageId);
+    console.log('📤 Sending email with options:', {
+      from: mailOptions.from,
+      to: mailOptions.to,
+      subject: mailOptions.subject,
+    });
+
+    // Send email with retry logic for Mailtrap
+    let info;
+    const maxRetries = 2;
+    let lastError;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`📤 Attempting to send email (attempt ${attempt}/${maxRetries})...`);
+        info = await transporter.sendMail(mailOptions);
+        break; // Success, exit retry loop
+      } catch (attemptError) {
+        lastError = attemptError;
+        console.error(`❌ Attempt ${attempt} failed:`, attemptError.message);
+        
+        // If it's a timeout/connection error and we have retries left, wait and retry
+        if ((attemptError.code === 'ETIMEDOUT' || attemptError.code === 'ESOCKET' || attemptError.code === 'ECONNECTION') && attempt < maxRetries) {
+          console.log(`⏳ Waiting 2 seconds before retry...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          continue;
+        }
+        
+        // If it's not a retryable error or we're out of retries, throw
+        throw attemptError;
+      }
+    }
+    
+    if (!info) {
+      throw lastError || new Error('Failed to send email after retries');
+    }
+    console.log('✅ Password reset email sent successfully:', {
+      messageId: info.messageId,
+      response: info.response,
+    });
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('❌ Error sending password reset email:', error);
-    throw new Error(`Failed to send email: ${error.message}`);
+    console.error('❌ Error sending password reset email:', {
+      message: error.message,
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      responseCode: error.responseCode,
+      stack: error.stack,
+    });
+    
+    // Provide more specific error messages
+    let errorMessage = `Failed to send email: ${error.message}`;
+    
+    if (error.code === 'EAUTH') {
+      errorMessage = 'فشل التحقق من البريد الإلكتروني. تحقق من SMTP_USER و SMTP_PASS في ملف .env';
+    } else if (error.code === 'ECONNECTION' || error.code === 'ESOCKET') {
+      errorMessage = 'فشل الاتصال بخادم البريد. تحقق من SMTP_HOST و SMTP_PORT في ملف .env. تأكد من أن Mailtrap credentials صحيحة';
+    } else if (error.code === 'ETIMEDOUT') {
+      errorMessage = 'انتهت مهلة الاتصال بخادم البريد. تحقق من: 1) Mailtrap credentials في .env 2) اتصال الإنترنت 3) Firewall لا يحجب Port 2525';
+    }
+    
+    throw new Error(errorMessage);
   }
 };
 

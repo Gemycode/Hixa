@@ -70,6 +70,31 @@ const authLimiter = rateLimit({
   },
 });
 
+// Rate limiting for tracking endpoint (1 request per second per IP or session)
+const trackLimiter = rateLimit({
+  windowMs: 1000, // 1 second
+  max: 1, // 1 request per second
+  message: 'Too many tracking requests',
+  handler: (req, res) => {
+    // Fail silently - always return 200 for tracking endpoint
+    return res.status(200).json({ status: "ok" });
+  },
+  keyGenerator: (req) => {
+    // Use sessionId if available, otherwise use IP
+    const sessionId = req.body?.sessionId;
+    if (sessionId) {
+      return `track:${sessionId}`;
+    }
+    // Fallback to IP
+    const ip = ipKeyGenerator(req);
+    return `track:${ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.headers['x-real-ip'] || req.connection?.remoteAddress || req.socket?.remoteAddress || 'unknown'}`;
+  },
+  skip: (req) => {
+    // Skip for OPTIONS requests (CORS preflight)
+    return req.method === 'OPTIONS';
+  },
+});
+
 // Security headers middleware
 const securityHeaders = [
   // Set security HTTP headers
@@ -161,6 +186,7 @@ const addSecurityHeaders = (req, res, next) => {
 module.exports = {
   apiLimiter,
   authLimiter,
+  trackLimiter,
   securityHeaders,
   corsOptions,
   handlePreflight,

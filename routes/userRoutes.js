@@ -4,6 +4,7 @@ const router = express.Router();
 const {
   createUser,
   getUsers,
+  getAdminUserFiltersMeta,
   getUserById,
   updateUser,
   deleteUser,
@@ -31,6 +32,8 @@ router.put("/me/change-password", protect, validatePasswordChange, changePasswor
 // Admin routes
 router.get("/", protect, restrictTo("admin"), getUsers);
 router.post("/", protect, restrictTo("admin"), validateUserCreate, createUser);
+// Admin: dropdown metadata for filters (countries + business scopes)
+router.get("/filters/meta", protect, restrictTo("admin"), getAdminUserFiltersMeta);
 router.get("/:id", protect, restrictTo("admin"), getUserById);
 router.put("/:id", protect, restrictTo("admin"), validateUserUpdate, updateUser);
 router.delete("/:id", protect, restrictTo("admin"), deleteUser);

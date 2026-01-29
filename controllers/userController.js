@@ -22,6 +22,81 @@ const sanitizeUser = (user) => ({
   updatedAt: user.updatedAt,
 });
 
+// ===== Admin filter metadata (countries + business scopes) =====
+const USER_BUSINESS_SCOPES = [
+  "المقاولات العامة",
+  "التطوير والتسويق العقاري",
+  "الأعمال الإنشائية",
+  "خدمات هندسية وتصاميم معمارية وديكور",
+  "الإشراف على المشاريع والاستشارات الهندسية",
+  "المواد والمنتجات الهندسية",
+  "أعمال العظم",
+  "الأعمال المعمارية والتشطيبات",
+  "أعمال الفرش والديكور",
+  "الأعمال الكهروميكانيكية (MEP)",
+  "أعمال الطرق والبنية التحتية",
+  "أعمال اللاندسكيب والموقع العام",
+  "أعمال الألمنيوم والمعدنية والخشبية",
+  "أعمال العزل والحماية",
+  "أعمال المسابح والمسطحات المائية",
+  "أعمال التشغيل والصيانة والتسليم",
+];
+
+const COUNTRIES = [
+  { key: "SA", value: "السعودية" },
+  { key: "AE", value: "الإمارات" },
+  { key: "KW", value: "الكويت" },
+  { key: "QA", value: "قطر" },
+  { key: "BH", value: "البحرين" },
+  { key: "OM", value: "عُمان" },
+  { key: "EG", value: "مصر" },
+  { key: "JO", value: "الأردن" },
+  { key: "LB", value: "لبنان" },
+  { key: "SY", value: "سوريا" },
+  { key: "YE", value: "اليمن" },
+  { key: "SD", value: "السودان" },
+  { key: "LY", value: "ليبيا" },
+  { key: "OTHER", value: "اخرى" },
+];
+
+const COUNTRY_CODE_TO_VALUE = COUNTRIES.reduce((acc, c) => {
+  acc[String(c.key).toUpperCase()] = c.value;
+  return acc;
+}, {});
+
+const normalizeToArray = (val) => {
+  if (val == null) return [];
+  if (Array.isArray(val)) return val.flatMap((v) => normalizeToArray(v));
+  if (typeof val === "string") {
+    return val
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+  return [val];
+};
+
+const normalizeCountryValues = (input) => {
+  const raw = normalizeToArray(input);
+  return raw
+    .map((v) => String(v).trim())
+    .filter(Boolean)
+    .map((v) => COUNTRY_CODE_TO_VALUE[v.toUpperCase()] || v);
+};
+
+const getAdminUserFiltersMeta = async (_req, res, next) => {
+  try {
+    res.json({
+      data: {
+        countries: COUNTRIES,
+        businessScopes: USER_BUSINESS_SCOPES,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Get current user's profile
 const getProfile = async (req, res, next) => {
   try {
@@ -177,11 +252,29 @@ const getUsers = async (req, res, next) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
     const skip = (page - 1) * limit;
 
-    const { role, search, isActive } = req.query;
+    const { role, search, isActive, country, category } = req.query;
     const filters = {};
 
     if (role) {
       filters.role = role;
+    }
+
+    // Country filter: accept Arabic value or ISO-like code (SA/AE/...)
+    // Also supports multiple via comma-separated values or repeated query params.
+    const countryValues = normalizeCountryValues(country);
+    if (countryValues.length === 1) {
+      filters.country = countryValues[0];
+    } else if (countryValues.length > 1) {
+      filters.country = { $in: countryValues };
+    }
+
+    // Business scope filter (matches Project "category" filter semantics)
+    // For users, business scope maps to `specializations` (array of strings).
+    const categoryValues = normalizeToArray(category).map((v) => String(v).trim()).filter(Boolean);
+    if (categoryValues.length === 1) {
+      filters.specializations = categoryValues[0];
+    } else if (categoryValues.length > 1) {
+      filters.specializations = { $in: categoryValues };
     }
 
     if (typeof isActive !== "undefined") {
@@ -395,6 +488,7 @@ const changePassword = async (req, res, next) => {
 
 module.exports = {
   createUser,
+  getAdminUserFiltersMeta,
   getUsers,
   getUserById,
   updateUser,

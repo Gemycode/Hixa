@@ -319,7 +319,7 @@ exports.getProjects = async (req, res, next) => {
 exports.getProjectById = async (req, res, next) => {
   try {
     const project = await Project.findById(req.params.id)
-      .populate("client", "name email avatar")
+      .populate("client", "name email avatar phone")
       .populate("assignedEngineer", "name email avatar")
       .populate("adminApproval.reviewedBy", "name email");
 
@@ -1245,6 +1245,8 @@ exports.getProjectStatistics = async (req, res, next) => {
       waitingForEngineers,
       inProgress,
       completed,
+      rejected,
+      cancelled,
     ] = await Promise.all([
       Project.countDocuments(filters),
       Project.countDocuments({ ...filters, status: "Draft" }),
@@ -1252,7 +1254,15 @@ exports.getProjectStatistics = async (req, res, next) => {
       Project.countDocuments({ ...filters, status: "Waiting for Engineers" }),
       Project.countDocuments({ ...filters, status: "In Progress" }),
       Project.countDocuments({ ...filters, status: "Completed" }),
+      Project.countDocuments({ ...filters, status: "Rejected" }),
+      Project.countDocuments({ ...filters, status: "Cancelled" }),
     ]);
+
+    // للوحة الأدمن: أرقام الكاردات (قيد المراجعة، النشطة، المعيّنة، مرفوضة/مؤرشفة)
+    const pendingReviewCount = draft + pendingReview;
+    const activeCount = waitingForEngineers;
+    const assignedCount = inProgress;
+    const rejectedArchivedCount = rejected + cancelled;
 
     res.json({
       total,
@@ -1261,6 +1271,13 @@ exports.getProjectStatistics = async (req, res, next) => {
       waitingForEngineers,
       inProgress,
       completed,
+      rejected,
+      cancelled,
+      // قيم جاهزة للكاردات في الفرونت
+      pendingReviewCount,
+      activeCount,
+      assignedCount,
+      rejectedArchivedCount,
     });
   } catch (error) {
     next(error);

@@ -155,8 +155,13 @@ const getChatRoomsByProjectRoom = async (req, res) => {
     }
 
     const chatRooms = await ChatRoom.find(chatRoomQuery)
+      .populate({
+        path: "project",
+        select: "title status client",
+        populate: { path: "client", select: "name email" },
+      })
       .populate("participants.user", "name email role avatar")
-      .populate("engineer", "name avatar")
+      .populate("engineer", "name email role avatar")
       .populate("lastMessage.sender", "name avatar")
       .sort({ createdAt: -1 });
 
@@ -183,7 +188,38 @@ const getChatRoomsByProjectRoom = async (req, res) => {
     });
 
     // Add unread count to each chat room
-    const chatRoomsWithUnread = await addUnreadCountToChatRooms(filteredChatRooms, userId);
+    let chatRoomsWithUnread = await addUnreadCountToChatRooms(filteredChatRooms, userId);
+
+    // Add displayTitle for frontend (with fallback from User collection)
+    chatRoomsWithUnread = await Promise.all(
+      chatRoomsWithUnread.map(async (room) => {
+        const r = room.toObject ? room.toObject() : { ...room };
+        let displayTitle = "";
+        if (r.type === "group") displayTitle = "الدردشة الجماعية";
+        else if (r.type === "admin-client") {
+          const name = (r.participants || []).find((p) => p.role === "client")?.user?.name || r.project?.client?.name;
+          if (name && String(name).trim()) displayTitle = String(name).trim();
+          else {
+            const clientId = r.project?.client?._id || r.project?.client;
+            if (clientId) {
+              const user = await User.findById(clientId).select("name").lean();
+              displayTitle = (user?.name && String(user.name).trim()) ? String(user.name).trim() : "العميل";
+            } else displayTitle = "العميل";
+          }
+        } else if (r.type === "admin-engineer" || r.type === "admin-company") {
+          const name = (r.participants || []).find((p) => p.role === "engineer" || p.role === "company")?.user?.name || r.engineer?.name;
+          if (name && String(name).trim()) displayTitle = String(name).trim();
+          else {
+            const engineerId = r.engineer?._id || r.engineer;
+            if (engineerId) {
+              const user = await User.findById(engineerId).select("name").lean();
+              displayTitle = (user?.name && String(user.name).trim()) ? String(user.name).trim() : "المهندس";
+            } else displayTitle = "المهندس";
+          }
+        } else displayTitle = "محادثة";
+        return { ...r, displayTitle };
+      })
+    );
 
     res.json({ data: chatRoomsWithUnread });
   } catch (error) {
@@ -263,10 +299,12 @@ const getMyChatRooms = async (req, res) => {
     const userRole = req.user.role;
     const { type, status: statusFilter, search } = req.query;
 
-    let chatRoomQuery = { "participants.user": userId, status: "active" };
+    let chatRoomQuery;
 
-    // For engineers and companies, also include rooms where they are the engineer (even if not in participants yet)
-    if (userRole === "engineer" || userRole === "company") {
+    // Admin sees all chat rooms in the system (no participant filter)
+    if (userRole === "admin") {
+      chatRoomQuery = { status: "active" };
+    } else if (userRole === "engineer" || userRole === "company") {
       // Ensure userId is ObjectId for proper matching
       const userIdObjectId = mongoose.Types.ObjectId.isValid(userId) 
         ? (userId instanceof mongoose.Types.ObjectId ? userId : new mongoose.Types.ObjectId(userId))
@@ -302,6 +340,9 @@ const getMyChatRooms = async (req, res) => {
           { type: "group" }, // Group chats are always visible after assignment
         ],
       };
+    } else {
+      // Fallback for any other role: only rooms where user is participant
+      chatRoomQuery = { "participants.user": userId, status: "active" };
     }
 
     // Filter by type
@@ -324,7 +365,11 @@ const getMyChatRooms = async (req, res) => {
 
     const chatRooms = await ChatRoom.find(chatRoomQuery)
       .populate("projectRoom", "project projectTitle")
-      .populate("project", "title status")
+      .populate({
+        path: "project",
+        select: "title status client",
+        populate: { path: "client", select: "name email" },
+      })
       .populate("participants.user", "name email role avatar")
       .populate("engineer", "name email role avatar")
       .populate("lastMessage.sender", "name avatar");
@@ -391,7 +436,63 @@ const getMyChatRooms = async (req, res) => {
     });
 
     // Add unread count to each chat room
-    const chatRoomsWithUnread = await addUnreadCountToChatRooms(filteredChatRooms, userId);
+    let chatRoomsWithUnread = await addUnreadCountToChatRooms(filteredChatRooms, userId);
+
+    // Add displayTitle for frontend (client/engineer actual names) - with fallback from User collection
+    chatRoomsWithUnread = await Promise.all(
+      chatRoomsWithUnread.map(async (room) => {
+        const r = room.toObject ? room.toObject() : { ...room };
+        let displayTitle = "";
+        if (r.type === "group") {
+          displayTitle = "الدردشة الجماعية";
+        } else if (r.type === "admin-client") {
+          const clientParticipant = (r.participants || []).find((p) => p.role === "client");
+          const participantName = clientParticipant?.user?.name;
+          if (participantName && String(participantName).trim()) {
+            displayTitle = String(participantName).trim();
+          } else if (r.project?.client) {
+            const client = r.project.client;
+            if (typeof client === "object" && client?.name && String(client.name).trim()) {
+              displayTitle = String(client.name).trim();
+            }
+          }
+          if (!displayTitle) {
+            const clientId = r.project?.client?._id || r.project?.client;
+            if (clientId) {
+              const user = await User.findById(clientId).select("name").lean();
+              displayTitle = (user?.name && String(user.name).trim()) ? String(user.name).trim() : "العميل";
+            } else {
+              displayTitle = "العميل";
+            }
+          }
+        } else if (r.type === "admin-engineer" || r.type === "admin-company") {
+          const engParticipant = (r.participants || []).find(
+            (p) => p.role === "engineer" || p.role === "company"
+          );
+          const participantName = engParticipant?.user?.name;
+          if (participantName && String(participantName).trim()) {
+            displayTitle = String(participantName).trim();
+          } else if (r.engineer) {
+            const eng = r.engineer;
+            if (typeof eng === "object" && eng?.name && String(eng.name).trim()) {
+              displayTitle = String(eng.name).trim();
+            }
+          }
+          if (!displayTitle) {
+            const engineerId = r.engineer?._id || r.engineer;
+            if (engineerId) {
+              const user = await User.findById(engineerId).select("name").lean();
+              displayTitle = (user?.name && String(user.name).trim()) ? String(user.name).trim() : "المهندس";
+            } else {
+              displayTitle = "المهندس";
+            }
+          }
+        } else {
+          displayTitle = "محادثة";
+        }
+        return { ...r, displayTitle };
+      })
+    );
 
     res.json({ data: chatRoomsWithUnread });
   } catch (error) {
@@ -737,6 +838,88 @@ const assignEngineerFromChat = async (req, res) => {
   }
 };
 
+// Reject engineer from chat - Admin rejects engineer's proposal from chat room
+const rejectEngineerFromChat = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const { reason, engineerId: bodyEngineerId } = req.body;
+    const userRole = req.user.role;
+
+    if (userRole !== "admin") {
+      return res.status(403).json({ message: "غير مصرح لك بهذه العملية" });
+    }
+
+    const chatRoom = await ChatRoom.findById(roomId);
+    if (!chatRoom) {
+      return res.status(404).json({ message: "غرفة الدردشة غير موجودة" });
+    }
+
+    if (chatRoom.type !== "admin-engineer" && chatRoom.type !== "admin-company") {
+      return res.status(400).json({ message: "يمكن رفض المهندس من شات الأدمن مع المهندس/الشركة فقط" });
+    }
+
+    let engineerId = bodyEngineerId || chatRoom.engineer;
+    if (!engineerId) {
+      const engineerParticipant = chatRoom.participants.find(
+        (p) => p.role === "engineer" || p.role === "company"
+      );
+      if (engineerParticipant) {
+        engineerId = engineerParticipant.user;
+      }
+    }
+    if (!engineerId) {
+      return res.status(400).json({ message: "لم يتم العثور على معرف المهندس" });
+    }
+    const engineerIdStr =
+      typeof engineerId === "object" && engineerId !== null
+        ? (engineerId._id || engineerId.id || engineerId).toString()
+        : String(engineerId);
+
+    const projectId = chatRoom.project._id || chatRoom.project;
+    const proposal = await Proposal.findOne({
+      project: projectId,
+      engineer: engineerIdStr,
+    }).populate("project", "title");
+
+    if (!proposal) {
+      return res.status(404).json({ message: "العرض غير موجود لهذا المهندس على هذا المشروع" });
+    }
+
+    if (proposal.status === "rejected") {
+      return res.status(400).json({ message: "تم رفض هذا العرض مسبقاً" });
+    }
+
+    proposal.status = "rejected";
+    await proposal.save();
+
+    const project = proposal.project;
+    const { createNotification } = require("./notificationController");
+    const rejectionMessage =
+      reason && reason.trim()
+        ? `تم رفض عرضك على المشروع "${project.title}". السبب: ${reason.trim()}`
+        : `تم رفض عرضك على المشروع "${project.title}"`;
+
+    await createNotification({
+      user: engineerIdStr,
+      type: "proposal_rejected",
+      title: "تم رفض عرضك",
+      message: rejectionMessage,
+      data: {
+        projectId: project._id,
+        proposalId: proposal._id,
+      },
+      actionUrl: `/proposals/${proposal._id}`,
+    }).catch((err) => console.error("Error creating rejection notification:", err));
+
+    res.json({
+      message: "تم رفض المهندس بنجاح",
+      data: { proposalId: proposal._id, status: "rejected" },
+    });
+  } catch (error) {
+    res.status(500).json({ message: "خطأ في الخادم", error: error.message });
+  }
+};
+
 // Archive chat room
 const archiveChatRoom = async (req, res) => {
   try {
@@ -960,12 +1143,24 @@ const markChatRoomAsRead = async (req, res) => {
     }
 
     // Check if user is participant
-    const isParticipant = chatRoom.participants.some(
+    let isParticipant = chatRoom.participants.some(
       p => p.user.toString() === userId.toString()
     );
 
     if (!isParticipant && req.user.role !== "admin") {
       return res.status(403).json({ message: "غير مسموح لك بالوصول إلى هذه الغرفة" });
+    }
+
+    // If admin viewing "all rooms" and not yet in participants, add them so lastReadAt/unread work
+    if (!isParticipant && req.user.role === "admin") {
+      chatRoom.participants.push({
+        user: userId,
+        role: "admin",
+        joinedAt: new Date(),
+        lastReadAt: new Date(),
+      });
+      await chatRoom.save();
+      isParticipant = true;
     }
 
     // Update lastReadAt
@@ -1023,6 +1218,7 @@ module.exports = {
   createChatRoom,
   startChat,
   assignEngineerFromChat,
+  rejectEngineerFromChat,
   archiveChatRoom,
   unarchiveChatRoom,
   deleteChatRoom,

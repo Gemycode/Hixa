@@ -5,7 +5,7 @@ const Joi = require('joi');
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-const roles = ['admin', 'engineer', 'client', 'customer'];
+const roles = ['admin', 'engineer', 'client', 'company'];
 
 // Reusable validation rules
 const commonRules = {
@@ -107,7 +107,7 @@ const registerRules = [
     
   body('role')
     .optional()
-    .isIn(['engineer', 'client', 'customer'])
+    .isIn(['engineer', 'client', 'company'])
     .withMessage('الدور المحدد غير صالح'),
 ];
 

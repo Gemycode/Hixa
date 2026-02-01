@@ -8,6 +8,7 @@ const {
   createChatRoom,
   startChat,
   assignEngineerFromChat,
+  rejectEngineerFromChat,
   archiveChatRoom,
   unarchiveChatRoom,
   deleteChatRoom,
@@ -34,6 +35,7 @@ router.put("/:roomId/read", markChatRoomAsRead);
 router.get("/:roomId/unread-count", getChatRoomUnreadCount);
 router.post("/:roomId/start-chat", restrictTo("admin"), startChat); // Admin starts chat
 router.post("/:roomId/assign-engineer", restrictTo("admin"), assignEngineerFromChat); // Admin assigns engineer from chat
+router.post("/:roomId/reject-engineer", restrictTo("admin"), rejectEngineerFromChat); // Admin rejects engineer from chat
 router.patch("/:roomId/archive", restrictTo("admin"), archiveChatRoom);
 router.patch("/:roomId/unarchive", restrictTo("admin"), unarchiveChatRoom);
 router.post("/:roomId/participants", restrictTo("admin"), validateAddParticipant, addParticipant);

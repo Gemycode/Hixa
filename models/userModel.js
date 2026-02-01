@@ -5,7 +5,7 @@ const UserSchema = new mongoose.Schema(
   {
     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
     password: { type: String, required: true, select: false },
-    role: { type: String, enum: ["admin", "engineer", "client", "company", "customer"], default: "customer" },
+    role: { type: String, enum: ["admin", "engineer", "client", "company"], default: "client" },
     name: { type: String, trim: true },
     phone: { type: String, trim: true, maxlength: 50 },
     countryCode: { type: String, trim: true, maxlength: 10 }, // كود البلد للجوال (مثل +966, +971)

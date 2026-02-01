@@ -1,6 +1,7 @@
 const socketIo = require("socket.io");
 const jwt = require("jsonwebtoken");
 const User = require("./models/userModel");
+const ChatRoom = require("./models/chatRoomModel");
 
 let io;
 
@@ -55,17 +56,28 @@ const initSocket = (server) => {
     // Or client explicitly joins rooms.
     // Client-side event: socket.emit('join_room', roomId);
     
-    socket.on("join_room", (roomId) => {
-      // TODO: Verify user has permission to join this room?
-      // Logic is already heavy in Controller, maybe basic check here or trust client for now if they have ID?
-      // Better: Check if roomId corresponds to a chatRoom they are participant of.
-      // For performance, we might skip DB check here if we trust the API provided the ID after check.
-      
-      console.log(`✅ User ${socket.user.name} (${socket.user._id}) joined room: ${roomId}`);
-      socket.join(roomId);
-      // Verify room membership
-      const rooms = Array.from(socket.rooms);
-      console.log(`📋 User is now in rooms:`, rooms);
+    socket.on("join_room", async (roomId) => {
+      try {
+        const chatRoom = await ChatRoom.findById(roomId).select("participants engineer type");
+        if (!chatRoom) {
+          return socket.emit("error", { message: "غرفة الدردشة غير موجودة" });
+        }
+        const userId = socket.user._id.toString();
+        const isParticipant = chatRoom.participants.some(
+          (p) => p.user.toString() === userId
+        );
+        const isEngineerInRoom =
+          chatRoom.engineer && chatRoom.engineer.toString() === userId;
+        const isAdmin = socket.user.role === "admin";
+        if (!isParticipant && !isEngineerInRoom && !isAdmin) {
+          return socket.emit("error", { message: "غير مسموح لك بالانضمام لهذه الغرفة" });
+        }
+        socket.join(roomId);
+        console.log(`✅ User ${socket.user.name} (${socket.user._id}) joined room: ${roomId}`);
+      } catch (err) {
+        console.error("join_room error:", err);
+        socket.emit("error", { message: "خطأ في التحقق من الصلاحية" });
+      }
     });
 
     socket.on("leave_room", (roomId) => {

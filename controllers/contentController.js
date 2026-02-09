@@ -107,8 +107,79 @@ exports.getContent = async (req, res) => {
 
 // UPDATE hero section
 exports.updateHero = async (req, res) => {
-  const { title_en, title_ar, subtitle_en, subtitle_ar } = req.body;
-  await updateSection("hero", { title_en, title_ar, subtitle_en, subtitle_ar }, res);
+  const { title_en, title_ar, subtitle_en, subtitle_ar, image, backgroundImage } = req.body;
+  const payload = { title_en, title_ar, subtitle_en, subtitle_ar };
+  if (image !== undefined) payload.image = image;
+  if (backgroundImage !== undefined) payload.backgroundImage = backgroundImage;
+  await updateSection("hero", payload, res);
+};
+
+// UPLOAD hero image (رفع صورة الهيرو)
+exports.uploadHeroImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "لم يتم رفع أي صورة" });
+    }
+
+    const content = await Content.findOne();
+    if (content && content.hero && content.hero.image && content.hero.image.includes("cloudinary.com")) {
+      try {
+        await deleteFromCloudinary(content.hero.image);
+      } catch (err) {
+        console.error("Error deleting old hero image from Cloudinary:", err);
+      }
+    }
+
+    const imageUrl = await uploadToCloudinary(req.file.buffer, "hixa/hero");
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $set: { "hero.image": imageUrl } },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    res.json({
+      message: "تم رفع صورة الهيرو بنجاح",
+      url: imageUrl,
+      data: updated.hero,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في رفع الصورة", error: err.message });
+  }
+};
+
+// UPLOAD hero background image (رفع خلفية الهيرو)
+exports.uploadHeroBackground = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "لم يتم رفع أي صورة" });
+    }
+
+    const content = await Content.findOne();
+    if (content && content.hero && content.hero.backgroundImage && content.hero.backgroundImage.includes("cloudinary.com")) {
+      try {
+        await deleteFromCloudinary(content.hero.backgroundImage);
+      } catch (err) {
+        console.error("Error deleting old hero background from Cloudinary:", err);
+      }
+    }
+
+    const imageUrl = await uploadToCloudinary(req.file.buffer, "hixa/hero/background");
+
+    const updated = await Content.findOneAndUpdate(
+      {},
+      { $set: { "hero.backgroundImage": imageUrl } },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    res.json({
+      message: "تم رفع خلفية الهيرو بنجاح",
+      url: imageUrl,
+      data: updated.hero,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "خطأ في رفع الخلفية", error: err.message });
+  }
 };
 
 // UPDATE about section

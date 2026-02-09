@@ -4,6 +4,8 @@ const router = express.Router();
 const {
   getContent,
   updateHero,
+  uploadHeroImage,
+  uploadHeroBackground,
   updateAbout,
   getServices,
   getService,
@@ -54,6 +56,8 @@ router.get("/", getContent);
 
 // Admin protected
 router.put("/hero", protect, restrictTo("admin"), validateHero, updateHero);
+router.post("/hero/image", protect, restrictTo("admin"), uploadSingle("image"), uploadHeroImage);
+router.post("/hero/background", protect, restrictTo("admin"), uploadSingle("image"), uploadHeroBackground);
 router.put("/about", protect, restrictTo("admin"), validateAbout, updateAbout);
 
 // Services

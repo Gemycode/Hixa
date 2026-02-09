@@ -141,6 +141,8 @@ const validateHero = (req, res, next) => {
     title_ar: Joi.string().max(200).required(),
     subtitle_en: Joi.string().max(1000).required(),
     subtitle_ar: Joi.string().max(1000).required(),
+    image: Joi.string().allow("").max(2000).optional(),
+    backgroundImage: Joi.string().allow("").max(2000).optional(),
   });
 
   const { error } = schema.validate(req.body);

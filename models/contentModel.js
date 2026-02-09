@@ -7,6 +7,8 @@ const ContentSchema = new mongoose.Schema(
       title_ar: { type: String, required: true },
       subtitle_en: { type: String, required: true },
       subtitle_ar: { type: String, required: true },
+      image: { type: String, default: "" },
+      backgroundImage: { type: String, default: "" },
     },
     about: {
       title_en: { type: String, default: "" },
